@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <utility>
 #include <vector>
 
@@ -37,6 +38,13 @@ D is defined by four functions, a,b,c,d.
 These four functions must be overriden with definitions to define the ODE
 system.
 
+Each is a function of t, which has type T.
+Usually, T=double, but it may also be an index type (e.g., std::size_t) if the
+derivative matrix is only known numerically at certain grid points/stored in an
+array.
+
+See documentation of ODESolver_2x2 for example.
+
 \par
 
 Note: in tests, deriving from a struct was significantly faster than using
@@ -55,7 +63,7 @@ template <typename T> struct DerivativeMatrix {
 
 //! Inner product of two std::arrays.
 /*! @details
-\f[ \sum_{i=0}^{N-1} a_i * b_i \f]
+\f[ inner_product(a, b) = \sum_{i=0}^{N-1} a_i * b_i \f]
 Where N = min(a.size(), b.size())
 */
 template <typename T, std::size_t N, std::size_t M>
@@ -77,8 +85,8 @@ constexpr auto inner_product(const std::array<T, N> &a,
 
 namespace helper {
 
-//! Simple struct for storing "Raw" Adams ("B") coeficients.
-/*! @details
+// Simple struct for storing "Raw" Adams ("B") coeficients.
+/*
 Stored as integers, with 'denominator' factored out. \n
 Converted to double  ("A" coefs) once, at compile time (see below). \n
 Adams coeficients, a_k, defined such that: \n
@@ -98,8 +106,8 @@ template <std::size_t K> struct AdamsB {
   long bK;
 };
 
-//! List of Adams coeficients data
-/*! @details
+// List of Adams coeficients data
+/*
 Note: there is (of course) no 0-step Adams method.
 The entry at [0] is invalid, and will produce 0.
 It is included so that the index of this list matches the order of the method.
@@ -198,12 +206,153 @@ public:
 };
 
 //==============================================================================
-//! Solves a 2x2 system of ODEs using K-step Adams-Moutlon method
+//! Solves a 2x2 system of ODEs using a K-step Adams-Moutlon method
 /*! @details
- dF/dt(t) = D(t) * F(t)
- F = {f(t), g(t)}
- D = {a(t), b(t)}
-     {c(t), d(t)}
+
+The system of ODEs is defined such that:
+
+\f[ \frac{dF(r)}{dt} = D(t) * F(t) \f]
+
+Where F is a 2D set of functions:
+
+\f[
+  F(t) = \begin{pmatrix}
+    f(t)\\
+    g(t)
+  \end{pmatrix}
+\f]
+
+and D is the 2x2 "derivative matrix":
+
+\f[
+  D(t) = \begin{pmatrix}
+    a(t) & b(t)\\
+    c(t) & d(t)
+  \end{pmatrix}
+\f]
+
+See struct `DerivativeMatrix` - which is a pure virtual struct that must be
+implmented by the user in order to define the ODE.
+
+The step-size, dt, must remain constant (since it must remain consistant between
+the K+1 and previous K points). It may be positive or negative, however. It's
+perfectly possible to have a non-uniform grid - this just introduces a Jacobian
+into the Derivative matrix.
+
+The template parameter, T, is the type of the argument of the Derivative Matrix
+(i.e., type of `t`). This is often `double`, but may also be an index type
+(e.g., std::size_t) if the derivative matrix is only known numerically at
+certain grid points/stored in an array.
+
+The first K points of the function F, and derivative dF/dt, must be known.
+You may directly access the f,g (function) and df,dg (derivative) arrays, to set
+these points.
+
+Alternatively, you may use the provided function
+  ```cpp
+  void initial(T t0, double f0, double g0);
+  ```
+which automatically sets the first K values for F (and dF), given a single
+initial value for F, f0=f(t0), fg=g(t0), by using successive N-step AM methods,
+for N={1,2,...,K-1}.
+
+For now, just a 2x2 system. In theory, simple to generalise to an N*N system,
+though requires a matrix inversion.
+
+\par
+
+**Example:** Bessel's differential equation
+
+\f[
+  x^2 \frac{d^2y}{dx^2} + x \frac{dy}{dx} + (x^2-n^2)y = 0
+\f]
+
+With y(0) = 1.0, the solutions are the Bessel functions, y(x) = J_n(x)
+
+This can be re-written as a pair of coupled first-order ODEs:
+
+\f[
+  \begin{align}
+  \frac{dy}{dx} &= p \\
+  \frac{dp}{dx} &= \left[\left(\frac{n}{x}\right)^2 - 1\right]y - \frac{1}{x} p
+  \end{align}
+\f]
+
+Putting this into the notation/form required for the solver we have:
+
+\f[
+  F(x) = \begin{pmatrix}
+    y(x)\\
+    p(x)
+  \end{pmatrix}
+\f]
+
+with the "derivative matrix":
+
+\f[
+  D(x) = \begin{pmatrix}
+    0 & 1 \\
+    \left(\frac{n}{x}\right)^2 - 1 & \frac{-1}{x}
+  \end{pmatrix}
+\f]
+
+i.e.,
+
+for n=1:
+
+```cpp
+  struct BesselDerivative : AdamsMoulton::DerivativeMatrix<double> {
+    double a(double) const final { return 0.0; }
+    double b(double) const final { return 1.0; }
+    double c(double t) const final { return 1.0/t/t - 1.0; }
+    double d(double t) const final { return -1.0 / t; }
+  };
+```
+
+Or, more generally (for example):
+
+```cpp
+  struct BesselDerivative : AdamsMoulton::DerivativeMatrix<double> {
+    int n;
+    BesselDerivative(int tn) : n(tn) {}
+    double a(double) const final { return 0.0; }
+    double b(double) const final { return 1.0; }
+    double c(double t) const final { return std::pow(n/t,2) - 1.0; }
+    double d(double t) const final { return -1.0 / t; }
+  };
+```
+
+Minimal example: -- see full examples included elsewhere
+
+```
+  // Construct the Derivative matrix (BesselDerivative defined above) with n=0
+  int n = 0;
+  BesselDerivative D{n};
+
+  // Set the step size:
+  double dt = 0.01;
+
+  // Construct the Solver, using K=6-step method:
+  AdamsMoulton::ODESolver_2x2<6> ode{dt, &D};
+
+  // Since 1/t appears, we cannot start at zero. Instead, begin at small t
+  double t0 = 1.0e-6;
+
+  // Set initial points:
+  // Note: these are *approximate*, since they are technically f(0.0)
+  double f0 = 1.0;
+  double g0 = 0.0;
+
+  // Use automatic solver for first K points:
+  ode.solve_initial_K(t0, f0, g0);
+
+  // Drive forwards another 100 steps
+  for (int i = 0; i < 100; ++i) {
+    ode.drive();
+    std::cout << ode.last_t() << " " << ode.last_f() << '\n';
+  }
+```
+
 */
 template <std::size_t K, typename T = double> class ODESolver_2x2 {
   static_assert(K > 0, "Order (K) for Adams method must be K>0");
@@ -214,11 +363,13 @@ template <std::size_t K, typename T = double> class ODESolver_2x2 {
 private:
   // Stores the AM coeficients
   static constexpr AM<K> am{};
+  // step size:
   double m_dt;
+  // previous 't' value
+  double m_t{1.0 / 0.0}; // initialise to NaN, invalid
+  const DerivativeMatrix<T> *m_D;
 
 public:
-  const DerivativeMatrix<T> *D;
-
   //! Arrays to store the previous K values of f and g. f.back() is the most
   //! recent value.
   /*!
@@ -234,22 +385,45 @@ public:
   double last_f() { return f.back(); }
   //! Returns most recent g value. Can also access g array directly
   double last_g() { return g.back(); }
+  //! Returns most recent f value. Can also access f array directly
+  double last_t() { return m_t; }
+  //! Returns the step size
+  double dt() { return m_dt; }
 
   //! Returns derivative, df/dt(t), given f(t),g(t),t
   double dfdt(double ft, double gt, T t) const {
-    return D->a(t) * ft + D->b(t) * gt;
+    return m_D->a(t) * ft + m_D->b(t) * gt;
   }
   //! Returns derivative, dg/dt(t), given f(t),g(t),t
   double dgdt(double ft, double gt, T t) const {
-    return D->c(t) * ft + D->d(t) * gt;
+    return m_D->c(t) * ft + m_D->d(t) * gt;
   }
 
 public:
-  ODESolver_2x2(double dt, const DerivativeMatrix<T> *tD) : m_dt(dt), D(tD) {}
+  //! Construct the solver. dt is the (constant) step size
+  //! @param dt -- (constant) step size
+  //! @param D -- Pointer to derivative matrix
+  /*! @details
+   The step-size, dt, may be positive (to drive forwards) or negative (to drive
+   backwards). \n
+   Note: a pointer to the DerivativeMatrix, tD, is stored.
+   This may not be null, and must outlive the ODESolver_2x2.
+  */
+  ODESolver_2x2(double dt, const DerivativeMatrix<T> *D) : m_dt(dt), m_D(D) {
+    assert(dt != 0.0 && "Cannot have zero step-size in ODESolver_2x2");
+    assert(D != nullptr &&
+           "Cannot have null Derivative Matrix in ODESolver_2x2");
+  }
 
   //! Drives the DE system to next value, F(t), assuming system has already
   //! been solved for the K previous values {t-K*dt, ..., t-dt}.
   /*! @details
+  Note: t must align properly with previous values: i.e., t = last_t + dt \n
+  We re-send t to the function to avoid large build-up of small errors. \n
+  There's an overload that avoids this, but care should be taken. \n
+  For example, the 10,000th point along t grid may not exactly line up with t0 +
+  10000*dt, particularly for complicated non-linear grids. \n
+
   The type of t (T) must match type required to compute DerivMatrix. \n
   This is often T=double if analytic formula for derivative is known. \n
   If we have a numerical approximation to the derivative stored, e.g., on a
@@ -262,7 +436,8 @@ public:
     // Use AM method to determine new values, given previous K values:
     const auto sf = f.back() + m_dt * inner_product(am.ak, df);
     const auto sg = g.back() + m_dt * inner_product(am.ak, dg);
-    const auto [a, b, c, d] = std::tuple{D->a(t), D->b(t), D->c(t), D->d(t)};
+    const auto [a, b, c, d] =
+        std::tuple{m_D->a(t), m_D->b(t), m_D->c(t), m_D->d(t)};
     const auto a0 = m_dt * am.aK;
     const auto a02 = a0 * a0;
     const auto det_inv = 1.0 / (1.0 - (a02 * (b * c - a * d) + a0 * (a + d)));
@@ -276,11 +451,15 @@ public:
     std::rotate(dg.begin(), dg.begin() + 1, dg.end());
 
     // Sets new values:
+    m_t = t;
     f.back() = fi;
     g.back() = gi;
     df.back() = dfdt(fi, gi, t);
     dg.back() = dgdt(fi, gi, t);
   }
+
+  //! Overload for 'default' case, where next t is defined as last_t + dt
+  void drive() { drive(next_t(last_t())); }
 
   //! Automatically sets the first K values for F (and dF), given a single
   //! initial value for F, f0=f(t0), fg=g(t0).
@@ -293,7 +472,8 @@ public:
   ... \n
   F[K-1] determined using F[0],F[1],...,F[K-2] and a (K-1)-step AM method \n
   */
-  void initial(T t0, double f0, double g0) {
+  void solve_initial_K(T t0, double f0, double g0) {
+    m_t = t0;
     f.at(0) = f0;
     g.at(0) = g0;
     df.at(0) = dfdt(f0, g0, t0);
@@ -302,9 +482,9 @@ public:
   }
 
 private:
-  // only used in initial(). Use this, because it works for double t, where next
-  // value is t+dt, and for integral t, where next value is t++ is driving
-  // forward (dt>0), or t-- if driving backwards (dt<0)
+  // only used in solve_initial_K(). Use this, because it works for double t,
+  // where next value is t+dt, and for integral t, where next value is t++ is
+  // driving forward (dt>0), or t-- if driving backwards (dt<0)
   T next_t(T t) {
     if constexpr (std::is_integral_v<T>) {
       return (m_dt > 0.0) ? t + 1 : t - 1;
@@ -313,7 +493,7 @@ private:
     }
   }
 
-  // Used recursively by initial() to find first K points
+  // Used recursively by solve_initial_K() to find first K points
   template <std::size_t ik> void first_k_i(T t) {
     if constexpr (ik >= K) {
       return;
@@ -322,17 +502,17 @@ private:
       // nb: ai.ak is smaller than df; inner_product still works
       const auto sf = f.at(ik - 1) + m_dt * inner_product(ai.ak, df);
       const auto sg = g.at(ik - 1) + m_dt * inner_product(ai.ak, dg);
-
       const auto a0 = m_dt * ai.aK;
       const auto a02 = a0 * a0;
-      const auto [a, b, c, d] = std::tuple{D->a(t), D->b(t), D->c(t), D->d(t)};
+      const auto [a, b, c, d] =
+          std::tuple{m_D->a(t), m_D->b(t), m_D->c(t), m_D->d(t)};
       const auto det_inv = 1.0 / (1.0 - (a02 * (b * c - a * d) + a0 * (a + d)));
-
       const auto fi = (sf - a0 * (d * sf - b * sg)) * det_inv;
       const auto gi = (sg - a0 * (-c * sf + a * sg)) * det_inv;
+      // Sets new values:
+      m_t = t;
       f.at(ik) = fi;
       g.at(ik) = gi;
-      // Sets new values:
       df.at(ik) = dfdt(fi, gi, t);
       dg.at(ik) = dgdt(fi, gi, t);
       // call recursively

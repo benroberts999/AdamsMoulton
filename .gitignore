@@ -4,10 +4,14 @@
 !**/
 ## except: gitignore file (only the one in /)
 !.gitignore
-## except: any file in any subdirectory that matches:
+!**/Doxyfile
 !**/Makefile
+## except: any file in any subdirectory that matches:
 !**/*.md
 !**/*.cpp
 !**/*.hpp
 !**/*.ipp
 !**/*.sh
+
+## output of doxygen
+doxy-out/*
