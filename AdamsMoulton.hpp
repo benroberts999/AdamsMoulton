@@ -8,6 +8,51 @@ namespace AdamsMoulton {
 
 //==============================================================================
 
+//! Pure-virtual struct, holds the derivative matrix for 2x2 system of ODEs.
+//! Derive from this, and implement a(t),b(t),c(t),d(t) to define the 2x2 ODE.
+/*! @details
+The system of ODEs is defined such that:
+
+\f[ \frac{dF(r)}{dt} = D(t) * F(t) \f]
+
+Where F is a 2D set of functions:
+
+\f[
+  F(t) = \begin{pmatrix}
+    f(t)\\
+    g(t)
+  \end{pmatrix}
+\f]
+
+and D is the 2x2 "derivative matrix":
+
+\f[
+  D(t) = \begin{pmatrix}
+    a(t) & b(t)\\
+    c(t) & d(t)
+  \end{pmatrix}
+\f]
+
+D is defined by four functions, a,b,c,d.
+These four functions must be overriden with definitions to define the ODE
+system.
+
+\par
+
+Note: in tests, deriving from a struct was significantly faster than using
+std::function, slightly faster than using function pointers, and performed about
+equally to directly implementing the DerivativeMatrix.
+*/
+template <typename T> struct DerivativeMatrix {
+  virtual double a(T t) const = 0;
+  virtual double b(T t) const = 0;
+  virtual double c(T t) const = 0;
+  virtual double d(T t) const = 0;
+  virtual ~DerivativeMatrix() = default;
+};
+
+//==============================================================================
+
 //! Inner product of two std::arrays.
 /*! @details
 \f[ \sum_{i=0}^{N-1} a_i * b_i \f]
@@ -99,7 +144,7 @@ static constexpr auto ADAMS_data = std::tuple{
 
 //==============================================================================
 
-//! Stores maximum K (order of AM method) for which we have coeficients
+//! Stores maximum K (order of AM method) for which we have coefficients
 //! implemented.
 static constexpr auto K_max =
     std::tuple_size_v<decltype(helper::ADAMS_data)> - 1;
@@ -153,20 +198,8 @@ public:
 };
 
 //==============================================================================
-template <typename T> class DerivMatrix {
-
-public:
-  DerivMatrix(){};
-
-  double a(T) const { return 0.0; }
-  double b(T) const { return 1.0; }
-  double c(T) const { return -1.0; }
-  double d(T t) const { return -1.0 / t; }
-};
-
-//==============================================================================
 //! Solves a 2x2 system of ODEs using K-step Adams-Moutlon method
-/*!
+/*! @details
  dF/dt(t) = D(t) * F(t)
  F = {f(t), g(t)}
  D = {a(t), b(t)}
@@ -184,6 +217,8 @@ private:
   double m_dt;
 
 public:
+  const DerivativeMatrix<T> *D;
+
   //! Arrays to store the previous K values of f and g. f.back() is the most
   //! recent value.
   /*!
@@ -195,8 +230,6 @@ public:
   //! Arrays to store the previous K values of derivatives, df and dg
   std::array<double, K> df{}, dg{};
 
-  DerivMatrix<T> D{};
-
   //! Returns most recent f value. Can also access f array directly
   double last_f() { return f.back(); }
   //! Returns most recent g value. Can also access g array directly
@@ -204,19 +237,19 @@ public:
 
   //! Returns derivative, df/dt(t), given f(t),g(t),t
   double dfdt(double ft, double gt, T t) const {
-    return D.a(t) * ft + D.b(t) * gt;
+    return D->a(t) * ft + D->b(t) * gt;
   }
   //! Returns derivative, dg/dt(t), given f(t),g(t),t
   double dgdt(double ft, double gt, T t) const {
-    return D.c(t) * ft + D.d(t) * gt;
+    return D->c(t) * ft + D->d(t) * gt;
   }
 
 public:
-  ODESolver_2x2(double dt) : m_dt(dt) {}
+  ODESolver_2x2(double dt, const DerivativeMatrix<T> *tD) : m_dt(dt), D(tD) {}
 
   //! Drives the DE system to next value, F(t), assuming system has already
   //! been solved for the K previous values {t-K*dt, ..., t-dt}.
-  /*!
+  /*! @details
   The type of t (T) must match type required to compute DerivMatrix. \n
   This is often T=double if analytic formula for derivative is known. \n
   If we have a numerical approximation to the derivative stored, e.g., on a
@@ -229,7 +262,7 @@ public:
     // Use AM method to determine new values, given previous K values:
     const auto sf = f.back() + m_dt * inner_product(am.ak, df);
     const auto sg = g.back() + m_dt * inner_product(am.ak, dg);
-    const auto [a, b, c, d] = std::tuple{D.a(t), D.b(t), D.c(t), D.d(t)};
+    const auto [a, b, c, d] = std::tuple{D->a(t), D->b(t), D->c(t), D->d(t)};
     const auto a0 = m_dt * am.aK;
     const auto a02 = a0 * a0;
     const auto det_inv = 1.0 / (1.0 - (a02 * (b * c - a * d) + a0 * (a + d)));
@@ -292,7 +325,7 @@ private:
 
       const auto a0 = m_dt * ai.aK;
       const auto a02 = a0 * a0;
-      const auto [a, b, c, d] = std::tuple{D.a(t), D.b(t), D.c(t), D.d(t)};
+      const auto [a, b, c, d] = std::tuple{D->a(t), D->b(t), D->c(t), D->d(t)};
       const auto det_inv = 1.0 / (1.0 - (a02 * (b * c - a * d) + a0 * (a + d)));
 
       const auto fi = (sf - a0 * (d * sf - b * sg)) * det_inv;
