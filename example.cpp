@@ -1,19 +1,8 @@
 #include "AdamsMoulton.hpp"
 #include <cmath>
+#include <complex>
 #include <gsl/gsl_sf_bessel.h>
 #include <iostream>
-
-double a(double) { return 0.0; }
-double b(double) { return 1.0; }
-double c(double) { return -1.0; }
-double d(double t) { return -1.0 / t; }
-
-template <typename T> struct DD : AdamsMoulton::DerivativeMatrix<T> {
-  double a(T t) const { return ::a(t); }
-  double b(T t) const { return ::b(t); }
-  double c(T t) const { return ::c(t); }
-  double d(T t) const { return ::d(t); }
-};
 
 //==============================================================================
 int main() {
@@ -22,31 +11,37 @@ int main() {
 
   int n = 0;
 
-  auto y = [=](double x) { return gsl_sf_bessel_Jn(n, x); };
+  auto y = [=](double x) { return gsl_sf_bessel_Jn(n, double(x)); };
 
   auto dy = [=](double x) {
-    return 0.5 * (gsl_sf_bessel_Jn(n - 1, x) - gsl_sf_bessel_Jn(n + 1, x));
+    return 0.5 * (gsl_sf_bessel_Jn(n - 1, double(x)) -
+                  gsl_sf_bessel_Jn(n + 1, double(x)));
   };
 
-  struct BesselDerivative : AdamsMoulton::DerivativeMatrix<double> {
+  struct BesselDerivative : AdamsMoulton::DerivativeMatrix<double, double> {
     int n;
     BesselDerivative(int tn) : n(tn) {}
     double a(double) const final { return 0.0; }
     double b(double) const final { return 1.0; }
-    double c(double t) const final { return std::pow(n / t, 2) - 1.0; }
+    double c(double) const final {
+      // return std::pow(double{1.0f * n} / t, 2) - 1.0f;
+      return -1.0f;
+    }
     double d(double t) const final { return -1.0 / t; }
   };
 
   BesselDerivative D2{n};
 
-  double dt = 0.01;
+  // double dt = {-0.0001, 0.0001};
+  double dt = -0.0001f;
 
-  AdamsMoulton::ODESolver_2x2<12> ode{dt, &D2};
+  AdamsMoulton::ODESolver_2x2<12, double, double> ode{dt, &D2};
 
-  double t0 = 1.0e-4;
+  // double t0 = {0.0, 1.0e-6};
+  double t0 = 1.0e-6;
   // Here we use 'exact' initial points; approximations work fine too
-  double f0 = y(t0);
-  double g0 = dy(t0);
+  double f0 = 1.0; // y(t0);
+  double g0 = 0.0; // dy(t0);
   std::cout << "Initial points: t0=" << t0 << ", f0=" << f0 << ", g0=" << g0
             << "\n";
 
@@ -57,19 +52,27 @@ int main() {
   for (std::size_t i = 0; i < ode.f.size(); ++i) {
     printf("%.2f %.10f [%.10f] %.10f [%.10f]\n", t, ode.f[i], y(t), ode.g[i],
            dy(t));
+    // printf("%.10f %.10f %.10f %.10f \n", t.real(), t.imag(),
+    // ode.f[i].real(),
+    //        ode.f[i].imag());
     t += dt;
   }
 
   // Solve the ODE out to very large t
   t = ode.last_t();
   std::cout << "...\n";
-  for (std::size_t i = 0; i < 1000000; ++i) {
+  for (std::size_t i = 0; i < 250; ++i) {
     t += dt;
     ode.drive();
+    // if (i % 5 == 0)
+    //   printf("%.10f %.10f %.10f  %.10f  \n", t.real(), t.imag(),
+    //          ode.f.back().real(), ode.f.back().imag());
   }
 
   auto eps = (ode.f.back() - y(t)) / y(t);
-  // std::cout << t << " " << ode.f.back() << " " << y(t) << " " << eps << '\n';
+  std::cout << t << " " << ode.f.back() << " " << y(t) << " " << eps << '\n';
   printf("%.2f %.10f [%.10f] %.10f [%.10f]  %.2e\n", t, ode.f.back(), y(t),
          ode.g.back(), dy(t), eps);
+  // printf("%.10f %.10f %.10f  %.10f  \n", t.real(), t.imag(),
+  //        ode.f.back().real(), ode.f.back().imag());
 }

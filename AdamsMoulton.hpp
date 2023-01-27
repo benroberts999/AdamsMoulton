@@ -2,15 +2,33 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <complex>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 namespace AdamsMoulton {
 
+// I don't know why I need this, even when I use static_cast???????
+// #pragma GCC diagnostic ignored "-Wfloat-conversion"
+
+//! User-defined type-trait: Checks whether T is a std::complex type
+/*! @details
+  For example:
+  static_assert(!is_complex_v<double>);
+  static_assert(!is_complex_v<float>);
+  static_assert(is_complex_v<std::complex<double>>);
+  static_assert(is_complex_v<std::complex<float>>);
+*/
+template <typename T> struct is_complex : std::false_type {};
+template <typename T> struct is_complex<std::complex<T>> : std::true_type {};
+template <typename T> constexpr bool is_complex_v = is_complex<T>::value;
+
 //==============================================================================
 
 //! Pure-virtual struct, holds the derivative matrix for 2x2 system of ODEs.
-//! Derive from this, and implement a(t),b(t),c(t),d(t) to define the 2x2 ODE.
+//! Derive from this, and implement a(t),b(t),c(t),d(t) to define the 2x2
+//! ODE.
 /*! @details
 The system of ODEs is defined such that:
 
@@ -39,23 +57,28 @@ These four functions must be overriden with definitions to define the ODE
 system.
 
 Each is a function of t, which has type T.
-Usually, T=double, but it may also be an index type (e.g., std::size_t) if the
-derivative matrix is only known numerically at certain grid points/stored in an
-array.
+Usually, T=double, but it may also be an index type (e.g., std::size_t) if
+the derivative matrix is only known numerically at certain grid
+points/stored in an array.
+
+The return type, Y, is also a template parameter.
+It is usually double, but may be any type (e.g., float or complex<double>).
+DerivativeMatrix will work with any type, though only arithmetic types will
+work in the ODE solver.
 
 See documentation of ODESolver_2x2 for example.
 
 \par
 
 Note: in tests, deriving from a struct was significantly faster than using
-std::function, slightly faster than using function pointers, and performed about
-equally to directly implementing the DerivativeMatrix.
+std::function, slightly faster than using function pointers, and performed
+about equally to directly implementing the DerivativeMatrix.
 */
-template <typename T> struct DerivativeMatrix {
-  virtual double a(T t) const = 0;
-  virtual double b(T t) const = 0;
-  virtual double c(T t) const = 0;
-  virtual double d(T t) const = 0;
+template <typename T, typename Y = double> struct DerivativeMatrix {
+  virtual Y a(T t) const = 0;
+  virtual Y b(T t) const = 0;
+  virtual Y c(T t) const = 0;
+  virtual Y d(T t) const = 0;
   virtual ~DerivativeMatrix() = default;
 };
 
@@ -64,18 +87,33 @@ template <typename T> struct DerivativeMatrix {
 //! Inner product of two std::arrays.
 /*! @details
 \f[ inner_product(a, b) = \sum_{i=0}^{N-1} a_i * b_i \f]
-Where N = min(a.size(), b.size())
+Where N = min(a.size(), b.size()).
+The types of the arrays may be different (T and U).
+However, U must be convertable to T; the return-type is T (same as first array).
 */
-template <typename T, std::size_t N, std::size_t M>
-constexpr auto inner_product(const std::array<T, N> &a,
-                             const std::array<T, M> &b) {
+template <typename T, typename U, std::size_t N, std::size_t M>
+constexpr T inner_product(const std::array<T, N> &a,
+                          const std::array<U, M> &b) {
+  static_assert(std::is_convertible_v<U, T>,
+                "In inner_product, type of second array (U) must be "
+                "convertable to that of dirst (T)");
   constexpr std::size_t Size = std::min(N, M);
+
   if constexpr (Size == 0) {
     return T{0};
-  } else {
-    auto res = a.front() * b.front();
+  } else if constexpr (!std::is_same_v<T, U> && is_complex_v<T>) {
+    // T * U must be convertable to T
+    // This is to avoid float conversion warning in case that U=double,
+    // T=complex<float>; want to case b to float, then to complex<float>
+    T res = a[0] * static_cast<typename T::value_type>(b[0]);
     for (std::size_t i = 1; i < Size; ++i) {
-      res += a[i] * b[i];
+      res += a[i] * static_cast<typename T::value_type>(b[i]);
+    }
+    return res;
+  } else { // T * U must be convertable to T
+    T res = a[0] * static_cast<T>(b[0]);
+    for (std::size_t i = 1; i < Size; ++i) {
+      res += a[i] * static_cast<T>(b[i]);
     }
     return res;
   }
@@ -172,6 +210,7 @@ The final coefficient is separated, such that: \n
 for k = {0,1,...,K-1} \n
 and
  \f[ a_K = b_K / denom \f]
+They are stored as doubles regardless of other template parameters.
 */
 template <std::size_t K, typename = std::enable_if_t<(K > 0)>,
           typename = std::enable_if_t<(K <= K_max)>>
@@ -184,18 +223,17 @@ private:
     static_assert(
         am.bk.size() == K,
         "Kth Entry in ADAMS_data must correspond to K-order AM method");
-    std::array<double, K> ak{};
+    std::array<double, K> tak{};
     for (std::size_t i = 0; i < K; ++i) {
-      ak.at(i) = double(am.bk.at(i)) / double(am.denom);
+      tak.at(i) = double(am.bk.at(i)) / double(am.denom);
     }
-    return ak;
+    return tak;
   }
 
   // Forms the final (double) aK coeficient, from the raw (int) bK one
   static constexpr double make_aK() {
     const auto &am = std::get<K>(helper::ADAMS_data);
-    double aK{double(am.bK) / double(am.denom)};
-    return aK;
+    return (double(am.bK) / double(am.denom));
   }
 
 public:
@@ -234,27 +272,31 @@ and D is the 2x2 "derivative matrix":
 See struct `DerivativeMatrix` - which is a pure virtual struct that must be
 implmented by the user in order to define the ODE.
 
-The step-size, dt, must remain constant (since it must remain consistant between
-the K+1 and previous K points). It may be positive or negative, however. It's
-perfectly possible to have a non-uniform grid - this just introduces a Jacobian
-into the Derivative matrix.
+The step-size, dt, must remain constant (since it must remain consistant
+between the K+1 and previous K points). It may be positive or negative,
+however. It's perfectly possible to have a non-uniform grid - this just
+introduces a Jacobian into the Derivative matrix.
 
-The template parameter, T, is the type of the argument of the Derivative Matrix
-(i.e., type of `t`). This is often `double`, but may also be an index type
-(e.g., std::size_t) if the derivative matrix is only known numerically at
+The template parameter, T, is the type of the argument of the Derivative
+Matrix (i.e., type of `t`). This is often `double`, but may also be an index
+type (e.g., std::size_t) if the derivative matrix is only known numerically at
 certain grid points/stored in an array.
 
+The template parameter, Y, is the type of the function value F(t), and the
+type of dt, and the return value of the Derivative Matrix. This is often
+`double`, but may also be another floating-point type, or std::complex.
+
 The first K points of the function F, and derivative dF/dt, must be known.
-You may directly access the f,g (function) and df,dg (derivative) arrays, to set
-these points.
+You may directly access the f,g (function) and df,dg (derivative) arrays, to
+set these points.
 
 Alternatively, you may use the provided function
   ```cpp
-  void initial(T t0, double f0, double g0);
+  void initial(T t0, Y f0, Y g0);
   ```
 which automatically sets the first K values for F (and dF), given a single
-initial value for F, f0=f(t0), fg=g(t0), by using successive N-step AM methods,
-for N={1,2,...,K-1}.
+initial value for F, f0=f(t0), fg=g(t0), by using successive N-step AM
+methods, for N={1,2,...,K-1}.
 
 For now, just a 2x2 system. In theory, simple to generalise to an N*N system,
 though requires a matrix inversion.
@@ -274,9 +316,8 @@ This can be re-written as a pair of coupled first-order ODEs:
 \f[
   \begin{align}
   \frac{dy}{dx} &= p \\
-  \frac{dp}{dx} &= \left[\left(\frac{n}{x}\right)^2 - 1\right]y - \frac{1}{x} p
-  \end{align}
-\f]
+  \frac{dp}{dx} &= \left[\left(\frac{n}{x}\right)^2 - 1\right]y - \frac{1}{x}
+p \end{align} \f]
 
 Putting this into the notation/form required for the solver we have:
 
@@ -301,7 +342,7 @@ i.e.,
 for n=1:
 
 ```cpp
-  struct BesselDerivative : AdamsMoulton::DerivativeMatrix<double> {
+  struct BesselDerivative : AdamsMoulton::DerivativeMatrix<double, double> {
     double a(double) const final { return 0.0; }
     double b(double) const final { return 1.0; }
     double c(double t) const final { return 1.0/t/t - 1.0; }
@@ -312,7 +353,7 @@ for n=1:
 Or, more generally (for example):
 
 ```cpp
-  struct BesselDerivative : AdamsMoulton::DerivativeMatrix<double> {
+  struct BesselDerivative : AdamsMoulton::DerivativeMatrix<double, double> {
     int n;
     BesselDerivative(int tn) : n(tn) {}
     double a(double) const final { return 0.0; }
@@ -354,63 +395,68 @@ Minimal example: -- see full examples included elsewhere
 ```
 
 */
-template <std::size_t K, typename T = double> class ODESolver_2x2 {
+template <std::size_t K, typename T = double, typename Y = double>
+class ODESolver_2x2 {
   static_assert(K > 0, "Order (K) for Adams method must be K>0");
   static_assert(K <= K_max,
                 "Order (K) requested for Adams method too "
                 "large. Adams coeficients are implemented up to K_max-1 only");
+  static_assert(
+      is_complex_v<Y> || std::is_floating_point_v<Y>,
+      "Template parameter Y (function values and dt) must be floating point "
+      "or complex");
+  static_assert(is_complex_v<Y> || std::is_floating_point_v<Y> ||
+                    std::is_integral_v<T>,
+                "Template parameter T (derivative matrix argument) must be "
+                "floating point, complex, or integral");
 
 private:
   // Stores the AM coeficients
   static constexpr AM<K> am{};
   // step size:
-  double m_dt;
+  Y m_dt;
   // previous 't' value
-  double m_t{1.0 / 0.0}; // initialise to NaN, invalid
-  const DerivativeMatrix<T> *m_D;
+  Y m_t{Y{1.0} / Y{0.0}}; // initialise to NaN, invalid
+  const DerivativeMatrix<T, Y> *m_D;
 
 public:
   //! Arrays to store the previous K values of f and g. f.back() is the most
   //! recent value.
   /*!
-  Note: Stored in the same order, regardless of sign of dt (i.e. whether driving
-  forwards or backwards). So f[0] is the 'oldest' value, f[K-1] is newest.
+  Note: Stored in the same order, regardless of sign of dt (i.e. whether
+  driving forwards or backwards). So f[0] is the 'oldest' value, f[K-1] is
+  newest.
   */
-  std::array<double, K> f{}, g{};
+  std::array<Y, K> f{}, g{};
 
   //! Arrays to store the previous K values of derivatives, df and dg
-  std::array<double, K> df{}, dg{};
+  std::array<Y, K> df{}, dg{};
 
   //! Returns most recent f value. Can also access f array directly
-  double last_f() { return f.back(); }
+  Y last_f() { return f.back(); }
   //! Returns most recent g value. Can also access g array directly
-  double last_g() { return g.back(); }
+  Y last_g() { return g.back(); }
   //! Returns most recent f value. Can also access f array directly
-  double last_t() { return m_t; }
+  Y last_t() { return m_t; }
   //! Returns the step size
-  double dt() { return m_dt; }
+  Y dt() { return m_dt; }
 
   //! Returns derivative, df/dt(t), given f(t),g(t),t
-  double dfdt(double ft, double gt, T t) const {
-    return m_D->a(t) * ft + m_D->b(t) * gt;
-  }
+  Y dfdt(Y ft, Y gt, T t) const { return m_D->a(t) * ft + m_D->b(t) * gt; }
   //! Returns derivative, dg/dt(t), given f(t),g(t),t
-  double dgdt(double ft, double gt, T t) const {
-    return m_D->c(t) * ft + m_D->d(t) * gt;
-  }
+  Y dgdt(Y ft, Y gt, T t) const { return m_D->c(t) * ft + m_D->d(t) * gt; }
 
 public:
   //! Construct the solver. dt is the (constant) step size
   //! @param dt -- (constant) step size
   //! @param D -- Pointer to derivative matrix
   /*! @details
-   The step-size, dt, may be positive (to drive forwards) or negative (to drive
-   backwards). \n
-   Note: a pointer to the DerivativeMatrix, tD, is stored.
-   This may not be null, and must outlive the ODESolver_2x2.
+   The step-size, dt, may be positive (to drive forwards) or negative (to
+   drive backwards). \n Note: a pointer to the DerivativeMatrix, tD, is
+   stored. This may not be null, and must outlive the ODESolver_2x2.
   */
-  ODESolver_2x2(double dt, const DerivativeMatrix<T> *D) : m_dt(dt), m_D(D) {
-    assert(dt != 0.0 && "Cannot have zero step-size in ODESolver_2x2");
+  ODESolver_2x2(Y dt, const DerivativeMatrix<T, Y> *D) : m_dt(dt), m_D(D) {
+    assert(dt != Y{0.0} && "Cannot have zero step-size in ODESolver_2x2");
     assert(D != nullptr &&
            "Cannot have null Derivative Matrix in ODESolver_2x2");
   }
@@ -421,8 +467,8 @@ public:
   Note: t must align properly with previous values: i.e., t = last_t + dt \n
   We re-send t to the function to avoid large build-up of small errors. \n
   There's an overload that avoids this, but care should be taken. \n
-  For example, the 10,000th point along t grid may not exactly line up with t0 +
-  10000*dt, particularly for complicated non-linear grids. \n
+  For example, the 10,000th point along t grid may not exactly line up with t0
+  + 10000*dt, particularly for complicated non-linear grids. \n
 
   The type of t (T) must match type required to compute DerivMatrix. \n
   This is often T=double if analytic formula for derivative is known. \n
@@ -434,13 +480,14 @@ public:
     // drives the DE system TO t. (previous value was =~ t - dt)
 
     // Use AM method to determine new values, given previous K values:
-    const auto sf = f.back() + m_dt * inner_product(am.ak, df);
-    const auto sg = g.back() + m_dt * inner_product(am.ak, dg);
+    const auto sf = f.back() + m_dt * inner_product(df, am.ak);
+    const auto sg = g.back() + m_dt * inner_product(dg, am.ak);
     const auto [a, b, c, d] =
         std::tuple{m_D->a(t), m_D->b(t), m_D->c(t), m_D->d(t)};
-    const auto a0 = m_dt * am.aK;
+    const auto a0 = m_dt * static_cast<Y>(am.aK);
     const auto a02 = a0 * a0;
-    const auto det_inv = 1.0 / (1.0 - (a02 * (b * c - a * d) + a0 * (a + d)));
+    const auto det_inv =
+        Y{1.0} / (Y{1.0} - (a02 * (b * c - a * d) + a0 * (a + d)));
     const auto fi = (sf - a0 * (d * sf - b * sg)) * det_inv;
     const auto gi = (sg - a0 * (-c * sf + a * sg)) * det_inv;
 
@@ -472,7 +519,7 @@ public:
   ... \n
   F[K-1] determined using F[0],F[1],...,F[K-2] and a (K-1)-step AM method \n
   */
-  void solve_initial_K(T t0, double f0, double g0) {
+  void solve_initial_K(T t0, Y f0, Y g0) {
     m_t = t0;
     f.at(0) = f0;
     g.at(0) = g0;
@@ -496,17 +543,19 @@ private:
   // Used recursively by solve_initial_K() to find first K points
   template <std::size_t ik> void first_k_i(T t) {
     if constexpr (ik >= K) {
+      (void)t; // suppress unused variable warning on old g++ versions
       return;
     } else {
       const AM<ik> ai{};
       // nb: ai.ak is smaller than df; inner_product still works
-      const auto sf = f.at(ik - 1) + m_dt * inner_product(ai.ak, df);
-      const auto sg = g.at(ik - 1) + m_dt * inner_product(ai.ak, dg);
-      const auto a0 = m_dt * ai.aK;
+      const auto sf = f.at(ik - 1) + m_dt * inner_product(df, ai.ak);
+      const auto sg = g.at(ik - 1) + m_dt * inner_product(dg, ai.ak);
+      const auto a0 = m_dt * static_cast<Y>(ai.aK);
       const auto a02 = a0 * a0;
       const auto [a, b, c, d] =
           std::tuple{m_D->a(t), m_D->b(t), m_D->c(t), m_D->d(t)};
-      const auto det_inv = 1.0 / (1.0 - (a02 * (b * c - a * d) + a0 * (a + d)));
+      const auto det_inv =
+          Y{1.0} / (Y{1.0} - (a02 * (b * c - a * d) + a0 * (a + d)));
       const auto fi = (sf - a0 * (d * sf - b * sg)) * det_inv;
       const auto gi = (sg - a0 * (-c * sf + a * sg)) * det_inv;
       // Sets new values:
