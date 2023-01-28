@@ -9,6 +9,24 @@ int main() {
   std::cout << "\n----------------------------------------\n";
   std::cout << "Adams Moulton test/example\n";
 
+  /*
+  1. Bessel example
+    a. few different K
+    b. Drive forwards + backwards
+    c. double and float ?
+    d. Non-uniform grid
+  2. Complex example
+  3. Array index example
+  4. Documentation
+  5. Unit tests (innards + outards)
+     + CI?
+  --
+  A. Schro/Dirac example
+  B. Add simple ODE case
+
+
+  */
+
   int n = 0;
 
   auto y = [=](double x) { return gsl_sf_bessel_Jn(n, double(x)); };

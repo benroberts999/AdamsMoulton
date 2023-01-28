@@ -5,24 +5,10 @@
 #include <complex>
 #include <type_traits>
 #include <utility>
-#include <vector>
 
+//! Contains classes and functions which use general N-step Adams Moulton method
+//! to solve systems of 2x2 ODEs, up to N=12.
 namespace AdamsMoulton {
-
-// I don't know why I need this, even when I use static_cast???????
-// #pragma GCC diagnostic ignored "-Wfloat-conversion"
-
-//! User-defined type-trait: Checks whether T is a std::complex type
-/*! @details
-  For example:
-  static_assert(!is_complex_v<double>);
-  static_assert(!is_complex_v<float>);
-  static_assert(is_complex_v<std::complex<double>>);
-  static_assert(is_complex_v<std::complex<float>>);
-*/
-template <typename T> struct is_complex : std::false_type {};
-template <typename T> struct is_complex<std::complex<T>> : std::true_type {};
-template <typename T> constexpr bool is_complex_v = is_complex<T>::value;
 
 //==============================================================================
 
@@ -56,9 +42,11 @@ D is defined by four functions, a,b,c,d.
 These four functions must be overriden with definitions to define the ODE
 system.
 
-Each is a function of t, which has type T.
-Usually, T=double, but it may also be an index type (e.g., std::size_t) if
-the derivative matrix is only known numerically at certain grid
+Template parameters, T and Y
+
+Each of the four functions is a function of t, which has type T.
+Usually, T=double or complex<double>, but it may also be an index type (e.g.,
+std::size_t) if the derivative matrix is only known numerically at certain grid
 points/stored in an array.
 
 The return type, Y, is also a template parameter.
@@ -84,10 +72,26 @@ template <typename T, typename Y = double> struct DerivativeMatrix {
 
 //==============================================================================
 
+// User-defined type-trait: Checks whether T is a std::complex type
+template <typename T> struct is_complex : std::false_type {};
+// User-defined type-trait: Checks whether T is a std::complex type
+template <typename T> struct is_complex<std::complex<T>> : std::true_type {};
+//! User-defined type-trait: Checks whether T is a std::complex type
+/*! @details
+  For example:
+  static_assert(!is_complex_v<double>);
+  static_assert(!is_complex_v<float>);
+  static_assert(is_complex_v<std::complex<double>>);
+  static_assert(is_complex_v<std::complex<float>>);
+*/
+template <typename T> constexpr bool is_complex_v = is_complex<T>::value;
+
+//==============================================================================
+
 //! Inner product of two std::arrays.
 /*! @details
 \f[ inner_product(a, b) = \sum_{i=0}^{N-1} a_i * b_i \f]
-Where N = min(a.size(), b.size()).
+Where `N = min(a.size(), b.size())`.
 The types of the arrays may be different (T and U).
 However, U must be convertable to T; the return-type is T (same as first array).
 */
@@ -102,7 +106,6 @@ constexpr T inner_product(const std::array<T, N> &a,
   if constexpr (Size == 0) {
     return T{0};
   } else if constexpr (!std::is_same_v<T, U> && is_complex_v<T>) {
-    // T * U must be convertable to T
     // This is to avoid float conversion warning in case that U=double,
     // T=complex<float>; want to case b to float, then to complex<float>
     T res = a[0] * static_cast<typename T::value_type>(b[0]);
@@ -110,7 +113,7 @@ constexpr T inner_product(const std::array<T, N> &a,
       res += a[i] * static_cast<typename T::value_type>(b[i]);
     }
     return res;
-  } else { // T * U must be convertable to T
+  } else {
     T res = a[0] * static_cast<T>(b[0]);
     for (std::size_t i = 1; i < Size; ++i) {
       res += a[i] * static_cast<T>(b[i]);
@@ -123,16 +126,16 @@ constexpr T inner_product(const std::array<T, N> &a,
 
 namespace helper {
 
-// Simple struct for storing "Raw" Adams ("B") coeficients.
+// Simple struct for storing "Raw" Adams ("B") coefficients.
 /*
 Stored as integers, with 'denominator' factored out. \n
 Converted to double  ("A" coefs) once, at compile time (see below). \n
-Adams coeficients, a_k, defined such that: \n
+Adams coefficients, a_k, defined such that: \n
  \f[ F_{n+K} = F_{n+K-1} + dx * \sum_{k=0}^K a_k y_{n+k} \f]
 where:
  \f[ y = d(F)/dr \f]
 Note: the 'order' of the coefs is reversed compared to some sources.
-The final coeficient is separated, such that: \n
+The final coefficient is separated, such that: \n
  \f[ a_k = b_k / denom \f]
 for k = {0,1,...,K-1} \n
 and
@@ -144,7 +147,7 @@ template <std::size_t K> struct AdamsB {
   long bK;
 };
 
-// List of Adams coeficients data
+// List of Adams coefficients data
 /*
 Note: there is (of course) no 0-step Adams method.
 The entry at [0] is invalid, and will produce 0.
@@ -197,7 +200,7 @@ static constexpr auto K_max =
 
 //==============================================================================
 
-//! Holds the K+1 Adams-Moulton ak coeficients for the K-step AM method. Final
+//! Holds the K+1 Adams-Moulton ak coefficients for the K-step AM method. Final
 //! one, aK, is stored separately.
 /*! @details
 The Adams coefficients, a_k, are defined such that: \n
@@ -214,10 +217,10 @@ They are stored as doubles regardless of other template parameters.
 */
 template <std::size_t K, typename = std::enable_if_t<(K > 0)>,
           typename = std::enable_if_t<(K <= K_max)>>
-struct AM {
+struct AM_Coefs {
 
 private:
-  // Forms the (double) ak coeficients, from the raw (int) bk ones
+  // Forms the (double) ak coefficients, from the raw (int) bk ones
   static constexpr std::array<double, K> make_ak() {
     const auto &am = std::get<K>(helper::ADAMS_data);
     static_assert(
@@ -230,16 +233,16 @@ private:
     return tak;
   }
 
-  // Forms the final (double) aK coeficient, from the raw (int) bK one
+  // Forms the final (double) aK coefficient, from the raw (int) bK one
   static constexpr double make_aK() {
     const auto &am = std::get<K>(helper::ADAMS_data);
     return (double(am.bK) / double(am.denom));
   }
 
 public:
-  //! First K coeficients: ak for k={0,1,...,K-1}
+  //! First K coefficients: ak for k={0,1,...,K-1}
   static constexpr std::array<double, K> ak{make_ak()};
-  //! Final aK coeficients: ak for k=K
+  //! Final aK coefficients: ak for k=K
   static constexpr double aK{make_aK()};
 };
 
@@ -274,13 +277,14 @@ implmented by the user in order to define the ODE.
 
 The step-size, dt, must remain constant (since it must remain consistant
 between the K+1 and previous K points). It may be positive or negative,
-however. It's perfectly possible to have a non-uniform grid - this just
-introduces a Jacobian into the Derivative matrix.
+however (or complex). It's perfectly possible to have a non-uniform grid - this
+just introduces a Jacobian into the Derivative matrix; dt must still be
+constant.
 
 The template parameter, T, is the type of the argument of the Derivative
-Matrix (i.e., type of `t`). This is often `double`, but may also be an index
-type (e.g., std::size_t) if the derivative matrix is only known numerically at
-certain grid points/stored in an array.
+Matrix (i.e., type of `t`). This is often `double` ro `complex<double>`, but may
+also be an index type (e.g., std::size_t) if the derivative matrix is only known
+numerically at certain grid points/stored in an array.
 
 The template parameter, Y, is the type of the function value F(t), and the
 type of dt, and the return value of the Derivative Matrix. This is often
@@ -292,7 +296,7 @@ set these points.
 
 Alternatively, you may use the provided function
   ```cpp
-  void initial(T t0, Y f0, Y g0);
+  void solve_initial_K(T t0, Y f0, Y g0);
   ```
 which automatically sets the first K values for F (and dF), given a single
 initial value for F, f0=f(t0), fg=g(t0), by using successive N-step AM
@@ -376,7 +380,7 @@ Minimal example: -- see full examples included elsewhere
   // Construct the Solver, using K=6-step method:
   AdamsMoulton::ODESolver_2x2<6> ode{dt, &D};
 
-  // Since 1/t appears, we cannot start at zero. Instead, begin at small t
+  // Since 1/t appears in D, we cannot start at zero. Instead, begin at small t
   double t0 = 1.0e-6;
 
   // Set initial points:
@@ -400,7 +404,7 @@ class ODESolver_2x2 {
   static_assert(K > 0, "Order (K) for Adams method must be K>0");
   static_assert(K <= K_max,
                 "Order (K) requested for Adams method too "
-                "large. Adams coeficients are implemented up to K_max-1 only");
+                "large. Adams coefficients are implemented up to K_max-1 only");
   static_assert(
       is_complex_v<Y> || std::is_floating_point_v<Y>,
       "Template parameter Y (function values and dt) must be floating point "
@@ -411,17 +415,17 @@ class ODESolver_2x2 {
                 "floating point, complex, or integral");
 
 private:
-  // Stores the AM coeficients
-  static constexpr AM<K> am{};
+  // Stores the AM coefficients
+  static constexpr AM_Coefs<K> am{};
   // step size:
   Y m_dt;
   // previous 't' value
   Y m_t{Y{1.0} / Y{0.0}}; // initialise to NaN, invalid
+  // Pointer to the derivative matrix
   const DerivativeMatrix<T, Y> *m_D;
 
 public:
-  //! Arrays to store the previous K values of f and g. f.back() is the most
-  //! recent value.
+  //! Arrays to store the previous K values of f and g.
   /*!
   Note: Stored in the same order, regardless of sign of dt (i.e. whether
   driving forwards or backwards). So f[0] is the 'oldest' value, f[K-1] is
@@ -452,8 +456,9 @@ public:
   //! @param D -- Pointer to derivative matrix
   /*! @details
    The step-size, dt, may be positive (to drive forwards) or negative (to
-   drive backwards). \n Note: a pointer to the DerivativeMatrix, tD, is
-   stored. This may not be null, and must outlive the ODESolver_2x2.
+   drive backwards); it may also be complex. \n
+   Note: a pointer to the DerivativeMatrix, tD, is stored. This may not be null,
+   and must outlive the ODESolver_2x2.
   */
   ODESolver_2x2(Y dt, const DerivativeMatrix<T, Y> *D) : m_dt(dt), m_D(D) {
     assert(dt != Y{0.0} && "Cannot have zero step-size in ODESolver_2x2");
@@ -470,14 +475,12 @@ public:
   For example, the 10,000th point along t grid may not exactly line up with t0
   + 10000*dt, particularly for complicated non-linear grids. \n
 
-  The type of t (T) must match type required to compute DerivMatrix. \n
+  The type of t (T) must match type required to compute DerivativeMatrix. \n
   This is often T=double if analytic formula for derivative is known. \n
   If we have a numerical approximation to the derivative stored, e.g., on a
   grid, then we may instead have T=std::size_t (or whatever). \n
   */
   void drive(T t) {
-
-    // drives the DE system TO t. (previous value was =~ t - dt)
 
     // Use AM method to determine new values, given previous K values:
     const auto sf = f.back() + m_dt * inner_product(df, am.ak);
@@ -492,6 +495,7 @@ public:
     const auto gi = (sg - a0 * (-c * sf + a * sg)) * det_inv;
 
     // Shift values along. nb: rotate({1,2,3,4}) = {2,3,4,1}
+    // We keep track of previous K values in order to determine next value
     std::rotate(f.begin(), f.begin() + 1, f.end());
     std::rotate(g.begin(), g.begin() + 1, g.end());
     std::rotate(df.begin(), df.begin() + 1, df.end());
@@ -505,7 +509,9 @@ public:
     dg.back() = dgdt(fi, gi, t);
   }
 
-  //! Overload for 'default' case, where next t is defined as last_t + dt
+  //! Overload of drive(T t) for 'default' case, where next t is defined as
+  //! last_t + dt (for arithmetic/complex types), or last_t++/last_t-- for
+  //! integral types (grid index).
   void drive() { drive(next_t(last_t())); }
 
   //! Automatically sets the first K values for F (and dF), given a single
@@ -546,7 +552,7 @@ private:
       (void)t; // suppress unused variable warning on old g++ versions
       return;
     } else {
-      const AM<ik> ai{};
+      const AM_Coefs<ik> ai{};
       // nb: ai.ak is smaller than df; inner_product still works
       const auto sf = f.at(ik - 1) + m_dt * inner_product(df, ai.ak);
       const auto sg = g.at(ik - 1) + m_dt * inner_product(dg, ai.ak);
