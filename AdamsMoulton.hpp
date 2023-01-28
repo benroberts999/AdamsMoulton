@@ -62,7 +62,7 @@ Note: in tests, deriving from a struct was significantly faster than using
 std::function, slightly faster than using function pointers, and performed
 about equally to directly implementing the DerivativeMatrix.
 */
-template <typename T, typename Y = double> struct DerivativeMatrix {
+template <typename T = double, typename Y = double> struct DerivativeMatrix {
   virtual Y a(T t) const = 0;
   virtual Y b(T t) const = 0;
   virtual Y c(T t) const = 0;
@@ -436,20 +436,6 @@ public:
   //! Arrays to store the previous K values of derivatives, df and dg
   std::array<Y, K> df{}, dg{};
 
-  //! Returns most recent f value. Can also access f array directly
-  Y last_f() { return f.back(); }
-  //! Returns most recent g value. Can also access g array directly
-  Y last_g() { return g.back(); }
-  //! Returns most recent f value. Can also access f array directly
-  Y last_t() { return m_t; }
-  //! Returns the step size
-  Y dt() { return m_dt; }
-
-  //! Returns derivative, df/dt(t), given f(t),g(t),t
-  Y dfdt(Y ft, Y gt, T t) const { return m_D->a(t) * ft + m_D->b(t) * gt; }
-  //! Returns derivative, dg/dt(t), given f(t),g(t),t
-  Y dgdt(Y ft, Y gt, T t) const { return m_D->c(t) * ft + m_D->d(t) * gt; }
-
 public:
   //! Construct the solver. dt is the (constant) step size
   //! @param dt -- (constant) step size
@@ -465,6 +451,22 @@ public:
     assert(D != nullptr &&
            "Cannot have null Derivative Matrix in ODESolver_2x2");
   }
+
+  constexpr std::size_t K_steps() const { return K; }
+
+  //! Returns most recent f value. Can also access f array directly
+  Y last_f() { return f.back(); }
+  //! Returns most recent g value. Can also access g array directly
+  Y last_g() { return g.back(); }
+  //! Returns most recent f value. Can also access f array directly
+  Y last_t() { return m_t; }
+  //! Returns the step size
+  Y dt() { return m_dt; }
+
+  //! Returns derivative, df/dt(t), given f(t),g(t),t
+  Y dfdt(Y ft, Y gt, T t) const { return m_D->a(t) * ft + m_D->b(t) * gt; }
+  //! Returns derivative, dg/dt(t), given f(t),g(t),t
+  Y dgdt(Y ft, Y gt, T t) const { return m_D->c(t) * ft + m_D->d(t) * gt; }
 
   //! Drives the DE system to next value, F(t), assuming system has already
   //! been solved for the K previous values {t-K*dt, ..., t-dt}.
