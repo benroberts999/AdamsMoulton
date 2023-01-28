@@ -5,11 +5,15 @@ WARN=-Wall -Wpedantic -Wextra -Wdouble-promotion -Wconversion -Wshadow \
 -Weffc++ -Wsign-conversion
 OPT=-O3
 
-all: example
+all: example Bessel
 
 clean:
 	rm -f -v example
 
-example: example.cpp AdamsMoulton.hpp
-	$(CXX) -o $@ $@.cpp $(WARN) $(OPT) -lgsl
+EXDIR=./examples
 
+example: $(EXDIR)/example.cpp AdamsMoulton.hpp
+	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I. -lgsl
+
+Bessel: $(EXDIR)/Bessel.cpp AdamsMoulton.hpp
+	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I. -lgsl
