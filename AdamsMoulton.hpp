@@ -420,7 +420,7 @@ private:
   // step size:
   Y m_dt;
   // previous 't' value
-  Y m_t{Y{1.0} / Y{0.0}}; // initialise to NaN, invalid
+  T m_t{T(0)}; // Should be invalid (nan), but no nan for int
   // Pointer to the derivative matrix
   const DerivativeMatrix<T, Y> *m_D;
 
@@ -459,7 +459,7 @@ public:
   //! Returns most recent g value. Can also access g array directly
   Y last_g() { return g.back(); }
   //! Returns most recent f value. Can also access f array directly
-  Y last_t() { return m_t; }
+  T last_t() { return m_t; }
   //! Returns the step size
   Y dt() { return m_dt; }
 
