@@ -45,7 +45,7 @@ int main() {
 
   ComplexDerivative D{};
 
-  constexpr std::size_t N_step = 12; // use 12-step method
+  constexpr std::size_t N_step = 5; // use 5-step method
 
   using ComplexAdams = AdamsMoulton::ODESolver_2x2<N_step, std::complex<double>,
                                                    std::complex<double>>;

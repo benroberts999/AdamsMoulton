@@ -22,7 +22,7 @@ and:
     D(t) = ( 0                 1 )
            ( (n/t)^2 - 1    -1/t ).
 
-The exact solution, with y(0)=1 and y'(0)=0, is theBessel function: 
+The exact solution, with y(0)=1 and y'(0)=0, is the Bessel function: 
 y(t) = J_n(t)
 )"};
 
@@ -52,9 +52,9 @@ int main() {
   };
 
   // Set the stp size
-  double dt = 0.00001;
+  double dt = 0.001;
   // Construct the solver:
-  AdamsMoulton::ODESolver_2x2<12> ode{dt, &D};
+  AdamsMoulton::ODESolver_2x2<6> ode{dt, &D};
 
   // Set the initial conditions. Note: derivative matrix has 1/t, so we cannot
   // start from 0. Instead start from 'small' value:

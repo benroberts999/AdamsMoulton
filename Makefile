@@ -5,10 +5,10 @@ WARN=-Wall -Wpedantic -Wextra -Wdouble-promotion -Wconversion -Wshadow \
 -Weffc++ -Wsign-conversion
 OPT=-O3
 
-all: Bessel Complex Schrodinger
+all: Bessel Complex Schrodinger Inhomogenous
 
 clean:
-	rm -f -v example Bessel Complex Schrodinger
+	rm -f -v Bessel Complex Schrodinger Inhomogenous
 
 EXDIR=./examples
 
@@ -20,4 +20,7 @@ Complex: $(EXDIR)/Complex.cpp AdamsMoulton.hpp
 	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I.
 
 Schrodinger: $(EXDIR)/Schrodinger.cpp AdamsMoulton.hpp
+	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I.
+
+Inhomogenous: $(EXDIR)/Inhomogenous.cpp AdamsMoulton.hpp
 	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I.
