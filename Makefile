@@ -5,15 +5,16 @@ WARN=-Wall -Wpedantic -Wextra -Wdouble-promotion -Wconversion -Wshadow \
 -Weffc++ -Wsign-conversion
 OPT=-O3
 
-all: example Bessel
+all: example Bessel Complex
 
 clean:
 	rm -f -v example
 
 EXDIR=./examples
 
-example: $(EXDIR)/example.cpp AdamsMoulton.hpp
-	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I. -lgsl
-
+# This one uses GSL library, to check against exact Bessel solution
 Bessel: $(EXDIR)/Bessel.cpp AdamsMoulton.hpp
 	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I. -lgsl
+
+Complex: $(EXDIR)/Complex.cpp AdamsMoulton.hpp
+	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I.

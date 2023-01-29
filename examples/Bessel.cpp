@@ -4,6 +4,9 @@
 #include <gsl/gsl_sf_bessel.h>
 #include <iostream>
 
+// Note: This example uses GSL (GNU Scientific Libraries) for evaluating `exact'
+// bessel functions; only required for testing the result.
+
 const std::string description{R"(
 Adams Moulton example: Bessel equation.
 
@@ -19,7 +22,8 @@ and:
     D(t) = ( 0                 1 )
            ( (n/t)^2 - 1    -1/t ).
 
-The exact solution, given y(0)=1, is the Bessel function: y(t) = J_n(t)
+The exact solution, with y(0)=1 and y'(0)=0, is theBessel function: 
+y(t) = J_n(t)
 )"};
 
 //==============================================================================
