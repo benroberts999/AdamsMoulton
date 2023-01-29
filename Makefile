@@ -5,10 +5,10 @@ WARN=-Wall -Wpedantic -Wextra -Wdouble-promotion -Wconversion -Wshadow \
 -Weffc++ -Wsign-conversion
 OPT=-O3
 
-all: example Bessel Complex NonUniform
+all: example Bessel Complex Schrodinger
 
 clean:
-	rm -f -v example
+	rm -f -v example Bessel Complex Schrodinger
 
 EXDIR=./examples
 
@@ -19,5 +19,5 @@ Bessel: $(EXDIR)/Bessel.cpp AdamsMoulton.hpp
 Complex: $(EXDIR)/Complex.cpp AdamsMoulton.hpp
 	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I.
 
-NonUniform: $(EXDIR)/NonUniform.cpp AdamsMoulton.hpp
+Schrodinger: $(EXDIR)/Schrodinger.cpp AdamsMoulton.hpp
 	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I.
