@@ -5,7 +5,7 @@ WARN=-Wall -Wpedantic -Wextra -Wdouble-promotion -Wconversion -Wshadow \
 -Weffc++ -Wsign-conversion
 OPT=-O3
 
-all: example Bessel Complex
+all: example Bessel Complex NonUniform
 
 clean:
 	rm -f -v example
@@ -17,4 +17,7 @@ Bessel: $(EXDIR)/Bessel.cpp AdamsMoulton.hpp
 	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I. -lgsl
 
 Complex: $(EXDIR)/Complex.cpp AdamsMoulton.hpp
+	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I.
+
+NonUniform: $(EXDIR)/NonUniform.cpp AdamsMoulton.hpp
 	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I.
