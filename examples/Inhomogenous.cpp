@@ -3,9 +3,6 @@
 #include <complex>
 #include <iostream>
 
-// Note: This example uses GSL (GNU Scientific Libraries) for evaluating `exact'
-// bessel functions; only required for testing the result.
-
 const std::string description{R"(
 Adams Moulton example: Inhomogenous ODE.
 

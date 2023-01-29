@@ -4,9 +4,6 @@
 #include <fstream>
 #include <iostream>
 
-// Note: This example uses GSL (GNU Scientific Libraries) for evaluating `exact'
-// bessel functions; only required for testing the result.
-
 const std::string description{R"(
 Solve the radial Schrodinger equation for Hydrogen (n=1, l=0).
 [See W. R. Johnson, Atomic Structure Theory (2007) for details]
@@ -65,19 +62,19 @@ int main() {
     drdt.push_back(tr); // for this grid, dr/dt = r
   }
 
-  // Define the DerivativeMatrix for the Bessel equation
+  // Define the DerivativeMatrix for the Schrodinger equation
   // Note: it stores the r values as arrays (std::vector), so takes an array
   // index (std::size_t) as the function argument (and returns double).
   // In this particular case, we have a functional form for r[t] and v(r) - but
   // in more complicated cases we don't, which is why it can be useful to store
   // on a grid.
-  struct BesselDerivative
+  struct SchrodingerDerivative
       : AdamsMoulton::DerivativeMatrix<std::size_t, double> {
     double E;
     std::vector<double> r;
     std::vector<double> drdt;
-    BesselDerivative(double tE, std::vector<double> tr,
-                     std::vector<double> tdrdt)
+    SchrodingerDerivative(double tE, std::vector<double> tr,
+                          std::vector<double> tdrdt)
         : E(tE), r(tr), drdt(tdrdt) {}
     double a(std::size_t) const final { return 0.0; }
     double b(std::size_t i) const final { return 1.0 * drdt[i]; }
@@ -88,7 +85,7 @@ int main() {
   };
 
   const double En = -0.5;
-  BesselDerivative D{En, r, drdt};
+  SchrodingerDerivative D{En, r, drdt};
 
   // Construct the solver:
   AdamsMoulton::ODESolver_2x2<12, std::size_t, double> ode{dt, &D};
