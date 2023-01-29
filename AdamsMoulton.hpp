@@ -67,6 +67,8 @@ template <typename T = double, typename Y = double> struct DerivativeMatrix {
   virtual Y b(T t) const = 0;
   virtual Y c(T t) const = 0;
   virtual Y d(T t) const = 0;
+  virtual Y Sf(T) const { return 0.0; };
+  virtual Y Sg(T) const { return 0.0; };
   virtual ~DerivativeMatrix() = default;
 };
 
@@ -464,9 +466,13 @@ public:
   Y dt() { return m_dt; }
 
   //! Returns derivative, df/dt(t), given f(t),g(t),t
-  Y dfdt(Y ft, Y gt, T t) const { return m_D->a(t) * ft + m_D->b(t) * gt; }
+  Y dfdt(Y ft, Y gt, T t) const {
+    return m_D->a(t) * ft + m_D->b(t) * gt + m_D->Sf(t);
+  }
   //! Returns derivative, dg/dt(t), given f(t),g(t),t
-  Y dgdt(Y ft, Y gt, T t) const { return m_D->c(t) * ft + m_D->d(t) * gt; }
+  Y dgdt(Y ft, Y gt, T t) const {
+    return m_D->c(t) * ft + m_D->d(t) * gt + m_D->Sg(t);
+  }
 
   //! Drives the DE system to next value, F(t), assuming system has already
   //! been solved for the K previous values {t-K*dt, ..., t-dt}.
@@ -485,8 +491,10 @@ public:
   void drive(T t) {
 
     // Use AM method to determine new values, given previous K values:
-    const auto sf = f.back() + m_dt * inner_product(df, am.ak);
-    const auto sg = g.back() + m_dt * inner_product(dg, am.ak);
+    const auto sf =
+        f.back() + m_dt * (inner_product(df, am.ak) + am.aK * m_D->Sf(t));
+    const auto sg =
+        g.back() + m_dt * (inner_product(dg, am.ak) + am.aK * m_D->Sg(t));
     const auto [a, b, c, d] =
         std::tuple{m_D->a(t), m_D->b(t), m_D->c(t), m_D->d(t)};
     const auto a0 = m_dt * static_cast<Y>(am.aK);
@@ -556,8 +564,10 @@ private:
     } else {
       const AM_Coefs<ik> ai{};
       // nb: ai.ak is smaller than df; inner_product still works
-      const auto sf = f.at(ik - 1) + m_dt * inner_product(df, ai.ak);
-      const auto sg = g.at(ik - 1) + m_dt * inner_product(dg, ai.ak);
+      const auto sf =
+          f.at(ik - 1) + m_dt * (inner_product(df, ai.ak) + am.aK * m_D->Sf(t));
+      const auto sg =
+          g.at(ik - 1) + m_dt * (inner_product(dg, ai.ak) + am.aK * m_D->Sg(t));
       const auto a0 = m_dt * static_cast<Y>(ai.aK);
       const auto a02 = a0 * a0;
       const auto [a, b, c, d] =

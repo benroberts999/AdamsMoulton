@@ -5,7 +5,7 @@ WARN=-Wall -Wpedantic -Wextra -Wdouble-promotion -Wconversion -Wshadow \
 -Weffc++ -Wsign-conversion
 OPT=-O3
 
-all: example Bessel Complex Schrodinger
+all: Bessel Complex Schrodinger
 
 clean:
 	rm -f -v example Bessel Complex Schrodinger
