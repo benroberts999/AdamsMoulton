@@ -16,9 +16,12 @@ namespace AdamsMoulton {
 //! Derive from this, and implement a(t),b(t),c(t),d(t) to define the 2x2
 //! ODE.
 /*! @details
+This struct is used by ODESolver_2x2, and defined the Derivative matrix, and the
+(optional) inhomogenous term.
+
 The system of ODEs is defined such that:
 
-\f[ \frac{dF(r)}{dt} = D(t) * F(t) \f]
+\f[ \frac{dF(t)}{dt} = D(t) * F(t) + S(t) \f]
 
 Where F is a 2D set of functions:
 
@@ -26,21 +29,31 @@ Where F is a 2D set of functions:
   F(t) = \begin{pmatrix}
     f(t)\\
     g(t)
-  \end{pmatrix}
+  \end{pmatrix},
 \f]
 
-and D is the 2x2 "derivative matrix":
+D is the 2x2 "derivative matrix":
 
 \f[
   D(t) = \begin{pmatrix}
     a(t) & b(t)\\
     c(t) & d(t)
-  \end{pmatrix}
+  \end{pmatrix},
 \f]
 
-D is defined by four functions, a,b,c,d.
-These four functions must be overriden with definitions to define the ODE
-system.
+and S(t) is the (optional) 2D inhomogenous term:
+
+\f[
+  S(t) = \begin{pmatrix}
+    s_f(t)\\
+    s_g(t)
+  \end{pmatrix}.
+\f]
+
+D (and, optionally S) must be provided by the user by implementing this
+DerivativeMatrix. \n
+D is defined by four functions, a,b,c,d. These four functions
+must be overriden with definitions to define the ODE system.
 
 Template parameters, T and Y
 
@@ -63,10 +76,12 @@ std::function, slightly faster than using function pointers, and performed
 about equally to directly implementing the DerivativeMatrix.
 */
 template <typename T = double, typename Y = double> struct DerivativeMatrix {
+  //! a,b,c,d are derivative matrix functions; all must be user implemented
   virtual Y a(T t) const = 0;
   virtual Y b(T t) const = 0;
   virtual Y c(T t) const = 0;
   virtual Y d(T t) const = 0;
+  //! Sf and Sg are optional inhomogenous terms
   virtual Y Sf(T) const { return 0.0; };
   virtual Y Sg(T) const { return 0.0; };
   virtual ~DerivativeMatrix() = default;
@@ -251,10 +266,9 @@ public:
 //==============================================================================
 //! Solves a 2x2 system of ODEs using a K-step Adams-Moutlon method
 /*! @details
-
 The system of ODEs is defined such that:
 
-\f[ \frac{dF(r)}{dt} = D(t) * F(t) \f]
+\f[ \frac{dF(t)}{dt} = D(t) * F(t) + S(t) \f]
 
 Where F is a 2D set of functions:
 
@@ -262,16 +276,25 @@ Where F is a 2D set of functions:
   F(t) = \begin{pmatrix}
     f(t)\\
     g(t)
-  \end{pmatrix}
+  \end{pmatrix},
 \f]
 
-and D is the 2x2 "derivative matrix":
+D is the 2x2 "derivative matrix":
 
 \f[
   D(t) = \begin{pmatrix}
     a(t) & b(t)\\
     c(t) & d(t)
-  \end{pmatrix}
+  \end{pmatrix},
+\f]
+
+and S(t) is the (optional) 2D inhomogenous term:
+
+\f[
+  S(t) = \begin{pmatrix}
+    s_f(t)\\
+    s_g(t)
+  \end{pmatrix}.
 \f]
 
 See struct `DerivativeMatrix` - which is a pure virtual struct that must be
