@@ -3,6 +3,7 @@
 #include <complex>
 #include <fstream>
 #include <iostream>
+#include <vector>
 
 const std::string description{R"(
 Solve the radial Schrodinger equation for Hydrogen (n=1, l=0).

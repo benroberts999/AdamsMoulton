@@ -1,0 +1,30 @@
+name: Coverage
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  coverage:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: "Install dependencies"
+      continue-on-error: true
+      run: |
+        set -x
+        sudo apt-get update -y
+        sudo apt-get install -y g++-11
+        sudo apt-get install -y make
+        sudo apt-get install -y libgsl-dev
+        sudo apt-get install -y lcov
+    - name: Build & use LCOV to prepare report
+      continue-on-error: true
+      run: make coverage
+    - name: Upload coverage to Codecov
+      continue-on-error: true
+      uses: codecov/codecov-action@v2

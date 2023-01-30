@@ -1,0 +1,36 @@
+name: Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  tests:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: "Install dependencies"
+      run: |
+        set -x
+        sudo apt-get update -y
+        sudo apt-get install -y make
+        sudo apt-get install -y g++-12
+        sudo apt-get install -y clang-14
+        sudo apt-get install -y libgsl-dev
+
+    - name: Build (clang++, with Werror)
+      run: make clean && make CXX='clang++-14 -Werror' test
+ 
+    - name: Run unit tests (clang++)
+      run: ./test
+
+    - name: Build (g++, with Werror)
+      run: make clean && make CXX='g++-12 -Werror' test
+ 
+    - name: Run unit tests (g++)
+      run: ./test

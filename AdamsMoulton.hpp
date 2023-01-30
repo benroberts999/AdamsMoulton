@@ -3,6 +3,7 @@
 #include <array>
 #include <cassert>
 #include <complex>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -212,7 +213,7 @@ static constexpr auto ADAMS_data = std::tuple{
 
 //! Stores maximum K (order of AM method) for which we have coefficients
 //! implemented.
-static constexpr auto K_max =
+static constexpr std::size_t K_max =
     std::tuple_size_v<decltype(helper::ADAMS_data)> - 1;
 
 //==============================================================================

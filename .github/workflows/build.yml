@@ -1,0 +1,62 @@
+name: Build (linux)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build_oldest:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: "Install dependencies"
+      run: |
+        set -x
+        sudo apt-get update -y
+        sudo apt-get install -y make 
+        sudo apt-get install -y g++-7 
+        sudo apt-get install -y clang-6.0 
+        sudo apt-get install -y libgsl-dev 
+
+    - name: Build examples (g++7, oldest tested g++)
+      run: make clean && make CXX=g++-7
+
+    - name: Run Bessel example (oldest g++)
+      run: ./Bessel
+
+    - name: Build ampsci (clang++ v:6, oldest tested clang)
+      run: make clean && make CXX=clang++-6.0
+
+    - name: Run Bessel example (oldest clang++)
+      run: ./Bessel
+
+  build_latest:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: "Install dependencies"
+      run: |
+        set -x
+        sudo apt-get update -y
+        sudo apt-get install -y make 
+        sudo apt-get install -y g++-12
+        sudo apt-get install -y clang-14
+        sudo apt-get install -y libgsl-dev 
+
+    - name: Build examples (g++12)
+      run: make clean && make CXX='g++-12 -Werror'
+
+    - name: Run Bessel example (latest g++)
+      run: ./Bessel
+
+    - name: Build ampsci (clang++ v:14)
+      run: make clean && make CXX='clang++-14 -Werror'
+
+    - name: Run Bessel example (latest clang++)
+      run: ./Bessel

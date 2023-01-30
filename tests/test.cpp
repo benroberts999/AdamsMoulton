@@ -27,6 +27,14 @@ TEST_CASE("Simple: integrate forwards") {
   double g0 = 1.0;
   ode.solve_initial_K(t0, f0, g0);
 
+  REQUIRE(ode.dfdt(ode.last_f(), ode.last_g(), ode.last_t()) ==
+          Approx(D.a(ode.last_t()) * ode.last_f() +
+                 D.b(ode.last_t()) * ode.last_g() + D.Sf(ode.last_t())));
+
+  REQUIRE(ode.dgdt(ode.last_f(), ode.last_g(), ode.last_t()) ==
+          Approx(D.c(ode.last_t()) * ode.last_f() +
+                 D.d(ode.last_t()) * ode.last_g() + D.Sg(ode.last_t())));
+
   // test the initial points:
   double t = 0.0;
   for (std::size_t i = 0; i < ode.f.size(); ++i) {
@@ -296,4 +304,62 @@ TEST_CASE("Complex") {
           Approx(y_expected(ode_iz.last_t()).real()).epsilon(1.0e-5));
   REQUIRE(ode_iz.last_f().imag() ==
           Approx(y_expected(ode_iz.last_t()).imag()).epsilon(1.0e-5));
+}
+
+//------------------------------------------------------------------------------
+TEST_CASE("Inhomogenous") {
+
+  // y''(x) = -y(x) + sin(x)
+  // The exact solution, with y(0)=0 and y'(0)=1, is:
+  // y(x) = 0.5 * [ 3*sin(x) - x*cos(x) ]
+
+  struct DM : AdamsMoulton::DerivativeMatrix<double> {
+    double a(double) const final { return 0.0; }
+    double b(double) const final { return 1.0; }
+    double c(double) const final { return -1.0; }
+    double d(double) const final { return 0.0; }
+    double Sf(double) const final { return 0.0; }
+    double Sg(double t) const final { return std::sin(t); }
+  };
+  DM D;
+
+  double dt = 0.001;
+  AdamsMoulton::ODESolver_2x2<5> ode{dt, &D};
+
+  REQUIRE(ode.dt() == dt);
+
+  double t0 = 0.0;
+  double f0 = 0.0;
+  double g0 = 1.0;
+  ode.solve_initial_K(t0, f0, g0);
+
+  auto y_exact = [](double x) {
+    return 0.5 * (3.0 * std::sin(x) - x * std::cos(x));
+  };
+
+  REQUIRE(ode.dfdt(ode.last_f(), ode.last_g(), ode.last_t()) ==
+          Approx(D.a(ode.last_t()) * ode.last_f() +
+                 D.b(ode.last_t()) * ode.last_g() + D.Sf(ode.last_t())));
+
+  REQUIRE(ode.dgdt(ode.last_f(), ode.last_g(), ode.last_t()) ==
+          Approx(D.c(ode.last_t()) * ode.last_f() +
+                 D.d(ode.last_t()) * ode.last_g() + D.Sg(ode.last_t())));
+
+  // test the initial points:
+  double t = 0.0;
+  for (std::size_t i = 0; i < ode.f.size(); ++i) {
+    REQUIRE(ode.f[i] == Approx(y_exact(t)).epsilon(1.0e-5));
+    t += ode.dt();
+  }
+  REQUIRE(ode.last_f() == ode.f.back());
+  REQUIRE(ode.last_g() == ode.g.back());
+
+  int num_steps = 1000;
+  for (int i = 0; i < num_steps; ++i) {
+    ode.drive();
+  }
+  REQUIRE(ode.last_f() == Approx(y_exact(ode.last_t())).epsilon(1.0e-5));
+
+  REQUIRE(ode.last_t() ==
+          Approx(t0 + (num_steps + (int)ode.K_steps() - 1) * ode.dt()));
 }
