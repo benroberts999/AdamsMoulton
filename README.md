@@ -235,16 +235,16 @@ Each is designed the demonstrate a capability of the library.
   * Demonstrates driving ODE forwards (dt>0) and backwards (dt<0)
     * This example uses GSL (GNU Scientific Library), just to compare against the expected result
     * It can be installed, e.g., on ubuntu: `apt install libgsl-dev`
-* **Complex**
+* **Complex** -- [Complex.cpp](examples/Complex.cpp)
   * Demonstrates use of complex numbers
-* **Inhomogenous**
+* **Inhomogenous** -- [Inhomogenous.cpp](examples/Inhomogenous.cpp)
   * Demonstrates ODE with inhomogenous term
-* **Schrodinger**
+* **Schrodinger** -- [Schrodinger.cpp](examples/Schrodinger.cpp)
   * Solves the Schrodinger for hydrogen. Demonstrates an ODE with:
     * a non-uniformly spaced grid (i.e., introduces a Jacobian)
     * and, a case where DerivativeMatrix is only known as given grid points (i.e., stored on an array)
     * In this case, while `Y=double`, `T` is an integer (array index) type (`T=std::size_t`)
-* **Dirac**
+* **Dirac** -- [Dirac.cpp](examples/Dirac.cpp)
   * Solves the Dirac equation for hydrogen. Demonstrates ODE with:
   * Demonstrates the case of a pair of coupled first-order ODEs (in all other examples, the system of ODEs is a single second-order ODE)
 

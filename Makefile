@@ -5,10 +5,10 @@ WARN=-Wall -Wpedantic -Wextra -Wdouble-promotion -Wconversion -Wshadow \
 -Weffc++ -Wsign-conversion
 OPT=-O3
 
-all: Bessel Complex Schrodinger Dirac Inhomogenous
+all: Bessel Complex Schrodinger Dirac Inhomogenous test
 
 clean:
-	rm -f -v Bessel Complex Schrodinger Dirac Inhomogenous
+	rm -f -v Bessel Complex Schrodinger Dirac Inhomogenous test
 
 EXDIR=./examples
 
@@ -27,3 +27,6 @@ Dirac: $(EXDIR)/Dirac.cpp AdamsMoulton.hpp
 
 Inhomogenous: $(EXDIR)/Inhomogenous.cpp AdamsMoulton.hpp
 	$(CXX) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I.
+
+test: ./tests/test.cpp AdamsMoulton.hpp
+	$(CXX) -o $@ ./tests/$@.cpp $(WARN) $(OPT) -I.
