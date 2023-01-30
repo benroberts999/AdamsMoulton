@@ -8,7 +8,7 @@ OPT=-O3
 all: Bessel Complex Schrodinger Dirac Inhomogenous
 
 clean:
-	rm -f -v Bessel Complex Schrodinger Dirac Inhomogenous test
+	rm -f -v Bessel Complex Schrodinger Dirac Inhomogenous test coverage coverage.info coverage-test.gcda coverage-test.gcno
 
 EXDIR=./examples
 
@@ -39,4 +39,4 @@ coverage:
 	./coverage
 	lcov --capture --directory . --output-file coverage.info
 	lcov --remove coverage.info '*/catch2/*' '*/tests/*' '*/examples/*' '/usr/*' --output-file coverage.info
-	lcov --list coverage.info |tee -a cov-info.txt
+	lcov --list coverage.info
