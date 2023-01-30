@@ -82,8 +82,8 @@ template <typename T = double, typename Y = double> struct DerivativeMatrix {
   virtual Y c(T t) const = 0;
   virtual Y d(T t) const = 0;
   //! Sf and Sg are optional inhomogenous terms
-  virtual Y Sf(T) const { return 0.0; };
-  virtual Y Sg(T) const { return 0.0; };
+  virtual Y Sf(T) const { return Y(0); };
+  virtual Y Sg(T) const { return Y(0); };
   virtual ~DerivativeMatrix() = default;
 };
 
@@ -307,7 +307,7 @@ just introduces a Jacobian into the Derivative matrix; dt must still be
 constant.
 
 The template parameter, T, is the type of the argument of the Derivative
-Matrix (i.e., type of `t`). This is often `double` ro `complex<double>`, but may
+Matrix (i.e., type of `t`). This is often `double` or `complex<double>`, but may
 also be an index type (e.g., std::size_t) if the derivative matrix is only known
 numerically at certain grid points/stored in an array.
 
@@ -477,13 +477,14 @@ public:
            "Cannot have null Derivative Matrix in ODESolver_2x2");
   }
 
+  //! Returns the AM order (number of steps), K
   constexpr std::size_t K_steps() const { return K; }
 
   //! Returns most recent f value. Can also access f array directly
   Y last_f() { return f.back(); }
   //! Returns most recent g value. Can also access g array directly
   Y last_g() { return g.back(); }
-  //! Returns most recent f value. Can also access f array directly
+  //! Returns most recent t value; last_f() := f(last_t())
   T last_t() { return m_t; }
   //! Returns the step size
   Y dt() { return m_dt; }
