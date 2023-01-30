@@ -1,11 +1,11 @@
 # Super basic makefile for examples.
-CXX=clang++ 
+CXX=g++ 
 STD=-std=c++17
 WARN=-Wall -Wpedantic -Wextra -Wdouble-promotion -Wconversion -Wshadow \
 -Weffc++ -Wsign-conversion
 OPT=-O3
 
-all: Bessel Complex Schrodinger Dirac Inhomogenous test
+all: Bessel Complex Schrodinger Dirac Inhomogenous
 
 clean:
 	rm -f -v Bessel Complex Schrodinger Dirac Inhomogenous test
@@ -28,6 +28,7 @@ Dirac: $(EXDIR)/Dirac.cpp AdamsMoulton.hpp
 Inhomogenous: $(EXDIR)/Inhomogenous.cpp AdamsMoulton.hpp
 	$(CXX) $(STD) -o $@ $(EXDIR)/$@.cpp $(WARN) $(OPT) -I.
 
+# Build the unit test executable (not built by default)
 test: ./tests/test.cpp AdamsMoulton.hpp
 	$(CXX) $(STD) -o $@ ./tests/$@.cpp $(WARN) $(OPT) -I.
 

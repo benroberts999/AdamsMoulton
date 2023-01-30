@@ -53,7 +53,7 @@ int main() {
   DiracDerivative D{En};
 
   // Construct the solver:
-  AdamsMoulton::ODESolver_2x2<6, double, double> ode{dr, &D};
+  AdamsMoulton::ODESolver2D<6, double, double> ode{dr, &D};
 
   // Set initial points (See Johnson 2007)
   const auto gamma = std::sqrt(1.0 - D.alpha * D.alpha);

@@ -54,7 +54,7 @@ int main() {
   // Set the stp size
   double dt = 0.001;
   // Construct the solver:
-  AdamsMoulton::ODESolver_2x2<6> ode{dt, &D};
+  AdamsMoulton::ODESolver2D<6> ode{dt, &D};
 
   // Set the initial conditions. Note: derivative matrix has 1/t, so we cannot
   // start from 0. Instead start from 'small' value:
@@ -105,7 +105,7 @@ int main() {
   // also: backwards:
   // Construct the solver:
   std::cout << "\nWe can also drive the ODE 'backwards' by setting -ve dt\n";
-  AdamsMoulton::ODESolver_2x2<12> ode_back{-dt, &D};
+  AdamsMoulton::ODESolver2D<12> ode_back{-dt, &D};
   ode_back.solve_initial_K(-t0, y(-t0), dy(-t0));
   double backwards_target = -75.0;
   std::cout << "Start close to zero; drive backwards to t=" << backwards_target

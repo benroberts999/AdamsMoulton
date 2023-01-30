@@ -2,14 +2,18 @@
 
 A single-file header-only implementation of the Adams-Moulton method for solving Ordinary Differential Equations (ODEs) written using modern c++. Requires c++17.
 
-Solves a general 2D system of ODEs using K-step Adams-Moutlon method,
+Solves a general 2D system of ODEs using K-step Adams-Moulton method,
 including those with inhomogenous terms.
 K is implemented from 1 to 12.
 Works for real and complex value problems.
 
 A 2D system of ODEs could be, e.g., a 2nd-order ODE, or a pair of coupled first-order ODEs.
 
-Could reaonably simple be extened to general N-dimension problems.
+Could reaonably simply be extened to general N-dimension problems.
+
+[![tests][tests-badge]][tests-url]
+[![build][build-badge]][build-url]
+[![codecov][cov-badge]][cov-url]
 
 ## Contents
 
@@ -69,7 +73,7 @@ $$
   \end{pmatrix}.
 $$
 
-In the Adams-Moutlon method, the ODE is written
+In the Adams-Moulton method, the ODE is written
 
 $$
 F_{n+K} = F_{n+K-1} + \delta t \sum_{i=0}^K a_i \left[\frac{dF}{dt}\right]_{n+i}.
@@ -88,7 +92,7 @@ Therefore, in a $K$-step AM method, it is required that the previous $K$ points 
 
 A relatively accurate and simple way to generate the first $K$ points given just a single initial value is to use successive M-step AM methods with $M=1,2,...,K-1$. This library does that automatically.
 
-The $a_k$ coeficients may be generated using the formula:
+The $a_k$ coefficients may be generated using the formula:
 
 $$
 a_k = \frac{(-1)^{K-k}}{k!(K-k)!} \int_0^1\frac{\Pi_{i=0}^K(u+i-1)}{u+K-k-1}{\rm d}u
@@ -110,7 +114,7 @@ There are four steps to using the method.
 Here, we give an overview to all the required functions.
 It might be easier to start by following the simple example in the next setion, or looking at the examples included in this repository (in /examples/).
 
-#### 1. Define ODE system
+### 1. Define ODE system
 
 First, we define the ODE system.
 We do this by providing an implementation to the pure-virtual struct `DerivativeMatrix`. Define your own struct which derives from `DerivativeMatrix`, and implement the a,b,c,d functions.
@@ -134,13 +138,13 @@ We do this by providing an implementation to the pure-virtual struct `Derivative
 * The `final` keyword is optional, but recommended, as it allows some compiler optimisations provided you never derive from `ODEDerivative`). The `const` keyword is not optional.
 * Here we named the struct `ODEDerivative`, but you may name it anything
 
-#### 2. Construct the solver
+### 2. Construct the solver
 
 Then, we construct the solver with fixed step-size, dt.
 
 ```cpp
   ODEDerivative D{/*possible arguments*/};
-  AdamsMoulton::ODESolver_2x2<K, T, Y> ode{dt, &D};
+  AdamsMoulton::ODESolver2D<K, T, Y> ode{dt, &D};
 ```
 
 * `D` is an instantiation of the user-defined `DerivativeMatrix` struct
@@ -150,9 +154,9 @@ Then, we construct the solver with fixed step-size, dt.
   * `dt` must be constant, since it must remain consistant between the K+1 and previous K points. It may, however, be positive or negative, real or complex
   * It's perfectly possible to have a non-uniform step-sizes - this introduces a Jacobian into the Derivative matrix; dt must still be constant. One of the examples shows a case like this
   * Note that `dt` has type `Y`, not `T` (though in most cases `T`=`Y`; see the examples for a case where this is not so)
-* The solver, `ODESolver_2x2` takes (and stores) a pointer to an instantiation of the user-defined `DerivativeMatrix` struct. This instantiation must therefore outlive the ``ODESolver_2x2` object.
+* The solver, `ODESolver2D` takes (and stores) a pointer to an instantiation of the user-defined `DerivativeMatrix` struct. This instantiation must therefore outlive the ``ODESolver2D` object.
 
-#### 3. Set the initial conditions
+### 3. Set the initial conditions
 
 The first K points of the function F, and derivative dF/dt, must be known.
 
@@ -187,7 +191,7 @@ Alternatively, you may directly access the f,g (function) and df,dg (derivative)
 * `df`, and `dg` hold the derivatives at the previous $K$ points
 * When you drive the ODE forward, only the last $K$ points are kept. You probably want to extract these solutions and store them however you regularly would (see example)
 
-#### 4. Drive the ODE
+### 4. Drive the ODE
 
 There are two functions to drive the ODE forwards. They do the exact same thing, which you use depends on your situation
 
@@ -251,7 +255,7 @@ Each is designed the demonstrate a capability of the library.
 You should look into the examples in `/examples/` directory for the full example.
 Here, we just show a basic outline of solving essel's differential equation
 
-#### Example: Bessel's differential equation
+### Example: Bessel's differential equation
 
 * See `/examples/Bessel.cpp` for full working example.
 
@@ -324,7 +328,7 @@ Minimal example: -- see full examples included elsewhere
   double dt = 0.01;
 
   // Construct the Solver, using K=6-step method:
-  AdamsMoulton::ODESolver_2x2<6> ode{dt, &D};
+  AdamsMoulton::ODESolver2D<6> ode{dt, &D};
 
   // Since 1/t appears in D, we cannot start at zero. Instead, begin at small t
   double t0 = 1.0e-6;
@@ -365,7 +369,8 @@ namespace AdamsMoulton {}
 ### Misc. functions/constants
 
 ```cpp
-template <typename T> constexpr bool is_complex_v = is_complex<T>::value;
+template <typename T> struct is_complex;
+template <typename T> constexpr bool is_complex_v;
 ```
 
 * User-defined type-trait: Checks whether T is a std::complex type
@@ -376,6 +381,7 @@ template <typename T> constexpr bool is_complex_v = is_complex<T>::value;
     static_assert(!is_complex_v<float>);
     static_assert(is_complex_v<std::complex<double>>);
     static_assert(is_complex_v<std::complex<float>>);
+    static_assert(is_complex<std::complex<float>>::value);
   ```
 
 ```cpp
@@ -465,10 +471,10 @@ template <typename T = double, typename Y = double> struct DerivativeMatrix{};
 
 ```cpp
 template <std::size_t K, typename T = double, typename Y = double>
-class ODESolver_2x2{};
+class ODESolver2D{};
 ```
 
-* Solves a 2x2 system of ODEs using a K-step Adams-Moutlon method
+* Solves a 2x2 system of ODEs using a K-step Adams-Moulton method
 * Form of the ODE defined above
 * Template parameter, `T`, is the type of the argument of the Derivative Matrix (i.e., type of `t`).  
   * This is often `double` or `complex<double>`, but may also be an index type (e.g., std::size_t) if the derivative matrix is only known numerically at certain grid points/stored in an array.
@@ -476,10 +482,10 @@ class ODESolver_2x2{};
 type of dt, and the return value of the Derivative Matrix.
   * This is often `double`, but may also be another floating-point type, or std::complex.
 
-#### Constructor
+### Constructor
 
 ```cpp
-  ODESolver_2x2(Y dt, const DerivativeMatrix<T, Y> *D);
+  ODESolver2D(Y dt, const DerivativeMatrix<T, Y> *D);
 ```
 
 * Constructor
@@ -489,15 +495,15 @@ type of dt, and the return value of the Derivative Matrix.
   * The step-size, dt, may be positive (to drive forwards) or negative (to drive backwards); it may also be complex.
 * Takes in a pointer to the DerivativeMatrix
   * This pointer to the DerivativeMatrix is stored.
-  * This may not be null,and must outlive the `ODESolver_2x2`.
+  * This may not be null,and must outlive the `ODESolver2D`.
 
-#### Public data members
+### Public data members
 
 ```cpp
-  std::array<Y, K> ODESolver_2x2::f;
-  std::array<Y, K> ODESolver_2x2::g;
-  std::array<Y, K> ODESolver_2x2::df;
-  std::array<Y, K> ODESolver_2x2::dg;
+  std::array<Y, K> ODESolver2D::f;
+  std::array<Y, K> ODESolver2D::g;
+  std::array<Y, K> ODESolver2D::df;
+  std::array<Y, K> ODESolver2D::dg;
 ```
 
 * Arrays of size K, type Y.
@@ -505,46 +511,46 @@ type of dt, and the return value of the Derivative Matrix.
 * g and f hold the previous K derivative values
 * Each value is separated by dt
 
-#### Public member functions
+### Public member functions
 
 ```cpp
-  constexpr std::size_t ODESolver_2x2::K_steps() const;
+  constexpr std::size_t ODESolver2D::K_steps() const;
 ```
 
 * Returns the AM order (number of steps), K
 
 ```cpp
-Y ODESolver_2x2::last_f();
-Y ODESolver_2x2::last_g();
+Y ODESolver2D::last_f();
+Y ODESolver2D::last_g();
 ```
 
 * Returns most recent values for f and g.
 * You may also access the f/g arrays directly
 
 ```cpp
-T ODESolver_2x2::last_t();
+T ODESolver2D::last_t();
 ```
 
 * Returns most recent t value
 * nb: last_f() := f(last_t())
 
 ```cpp
-Y ODESolver_2x2::dt() { return m_dt; }
+Y ODESolver2D::dt() { return m_dt; }
 ```
 
 * Returns the step size
 
 ```cpp
-Y ODESolver_2x2::dfdt(Y ft, Y gt, T t) const;
-Y ODESolver_2x2::dgdt(Y ft, Y gt, T t) const;
+Y ODESolver2D::dfdt(Y ft, Y gt, T t) const;
+Y ODESolver2D::dgdt(Y ft, Y gt, T t) const;
 ```
 
 * Returns derivative, df/dt(t) and df/dt(t), given f(t),g(t),t
 * Invokes the DerivativeMatrix
 
 ```cpp
-void ODESolver_2x2::drive();
-void ODESolver_2x2::drive(T t);
+void ODESolver2D::drive();
+void ODESolver2D::drive(T t);
 ```
 
 * Drives the DE system to next value, F(t), assuming system has already been solved for the K previous values {t-K*dt, ..., t-dt}.
@@ -553,3 +559,9 @@ void ODESolver_2x2::drive(T t);
   * There's an overload that avoids this, but care should be taken.
 * The type of t (`T`) must match type required to compute DerivativeMatrix.
   
+[tests-badge]: https://github.com/benroberts999/AdamsMoulton/actions/workflows/tests.yml/badge.svg
+[tests-url]:   https://github.com/benroberts999/AdamsMoulton/actions/workflows/tests.yml
+[build-badge]: https://github.com/benroberts999/AdamsMoulton/actions/workflows/build.yml/badge.svg
+[build-url]: https://github.com/benroberts999/AdamsMoulton/actions/workflows/build.yml
+[cov-badge]: https://codecov.io/gh/benroberts999/AdamsMoulton/branch/main/graph/badge.svg?token=P46VLY5JIJ
+[cov-url]: https://codecov.io/gh/benroberts999/AdamsMoulton

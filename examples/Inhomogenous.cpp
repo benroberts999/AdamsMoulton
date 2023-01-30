@@ -53,7 +53,7 @@ int main() {
   // Set the stp size
   double dt = 0.0001;
   // Construct the solver:
-  AdamsMoulton::ODESolver_2x2<5> ode{dt, &D};
+  AdamsMoulton::ODESolver2D<5> ode{dt, &D};
 
   // Set the initial conditions:
   double t0 = 0.0;

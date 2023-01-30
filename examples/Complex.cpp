@@ -47,7 +47,7 @@ int main() {
 
   constexpr std::size_t N_step = 5; // use 5-step method
 
-  using ComplexAdams = AdamsMoulton::ODESolver_2x2<N_step, std::complex<double>,
+  using ComplexAdams = AdamsMoulton::ODESolver2D<N_step, std::complex<double>,
                                                    std::complex<double>>;
 
   // We will solve the ODE twice, once along the real axis, then along the

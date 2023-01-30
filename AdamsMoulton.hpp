@@ -5,7 +5,6 @@
 #include <complex>
 #include <tuple>
 #include <type_traits>
-#include <utility>
 
 //! Contains classes and functions which use general N-step Adams Moulton method
 //! to solve systems of 2x2 ODEs, up to N=12.
@@ -17,7 +16,7 @@ namespace AdamsMoulton {
 //! Derive from this, and implement a(t),b(t),c(t),d(t) to define the 2x2
 //! ODE.
 /*! @details
-This struct is used by ODESolver_2x2, and defined the Derivative matrix, and the
+This struct is used by ODESolver2D, and defined the Derivative matrix, and the
 (optional) inhomogenous term.
 
 The system of ODEs is defined such that:
@@ -68,7 +67,7 @@ It is usually double, but may be any type (e.g., float or complex<double>).
 DerivativeMatrix will work with any type, though only arithmetic types will
 work in the ODE solver.
 
-See documentation of ODESolver_2x2 for example.
+See documentation of ODESolver2D for example.
 
 \par
 
@@ -101,6 +100,7 @@ template <typename T> struct is_complex<std::complex<T>> : std::true_type {};
   static_assert(!is_complex_v<float>);
   static_assert(is_complex_v<std::complex<double>>);
   static_assert(is_complex_v<std::complex<float>>);
+  static_assert(is_complex<std::complex<float>>::value);
 */
 template <typename T> constexpr bool is_complex_v = is_complex<T>::value;
 
@@ -111,7 +111,8 @@ template <typename T> constexpr bool is_complex_v = is_complex<T>::value;
 \f[ inner_product(a, b) = \sum_{i=0}^{N-1} a_i * b_i \f]
 Where `N = min(a.size(), b.size())`.
 The types of the arrays may be different (T and U).
-However, U must be convertable to T; the return-type is T (same as first array).
+However, U must be convertable to T; the return-type is T (same as first
+array).
 */
 template <typename T, typename U, std::size_t N, std::size_t M>
 constexpr T inner_product(const std::array<T, N> &a,
@@ -265,7 +266,7 @@ public:
 };
 
 //==============================================================================
-//! Solves a 2x2 system of ODEs using a K-step Adams-Moutlon method
+//! Solves a 2D system of ODEs using a K-step Adams-Moulton method
 /*! @details
 The system of ODEs is defined such that:
 
@@ -404,7 +405,7 @@ Minimal example: -- see full examples included elsewhere
   double dt = 0.01;
 
   // Construct the Solver, using K=6-step method:
-  AdamsMoulton::ODESolver_2x2<6> ode{dt, &D};
+  AdamsMoulton::ODESolver2D<6> ode{dt, &D};
 
   // Since 1/t appears in D, we cannot start at zero. Instead, begin at small t
   double t0 = 1.0e-6;
@@ -426,7 +427,7 @@ Minimal example: -- see full examples included elsewhere
 
 */
 template <std::size_t K, typename T = double, typename Y = double>
-class ODESolver_2x2 {
+class ODESolver2D {
   static_assert(K > 0, "Order (K) for Adams method must be K>0");
   static_assert(K <= K_max,
                 "Order (K) requested for Adams method too "
@@ -470,12 +471,11 @@ public:
    The step-size, dt, may be positive (to drive forwards) or negative (to
    drive backwards); it may also be complex. \n
    Note: a pointer to the DerivativeMatrix, tD, is stored. This may not be null,
-   and must outlive the ODESolver_2x2.
+   and must outlive the ODESolver2D.
   */
-  ODESolver_2x2(Y dt, const DerivativeMatrix<T, Y> *D) : m_dt(dt), m_D(D) {
-    assert(dt != Y{0.0} && "Cannot have zero step-size in ODESolver_2x2");
-    assert(D != nullptr &&
-           "Cannot have null Derivative Matrix in ODESolver_2x2");
+  ODESolver2D(Y dt, const DerivativeMatrix<T, Y> *D) : m_dt(dt), m_D(D) {
+    assert(dt != Y{0.0} && "Cannot have zero step-size in ODESolver2D");
+    assert(D != nullptr && "Cannot have null Derivative Matrix in ODESolver2D");
   }
 
   //! Returns the AM order (number of steps), K
@@ -587,7 +587,7 @@ private:
       (void)t; // suppress unused variable warning on old g++ versions
       return;
     } else {
-      const AM_Coefs<ik> ai{};
+      constexpr AM_Coefs<ik> ai{};
       // nb: ai.ak is smaller than df; inner_product still works
       const auto sf =
           f.at(ik - 1) + m_dt * (inner_product(df, ai.ak) + am.aK * m_D->Sf(t));

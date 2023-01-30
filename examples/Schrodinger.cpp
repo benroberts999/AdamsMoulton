@@ -89,7 +89,7 @@ int main() {
   SchrodingerDerivative D{En, r, drdt};
 
   // Construct the solver:
-  AdamsMoulton::ODESolver_2x2<12, std::size_t, double> ode{dt, &D};
+  AdamsMoulton::ODESolver2D<12, std::size_t, double> ode{dt, &D};
 
   // Set initial points (See Johnson 2007)
   double f0 = 2.0 * r0;

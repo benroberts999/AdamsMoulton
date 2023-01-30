@@ -3,6 +3,13 @@
 #include "tests/catch2/catch.hpp"
 #include <cmath>
 
+// Uses Catch2 library:
+/*
+This project uses Catch2 for its testing framework.
+Catch2 is open source, and may be found:
+[github.com/catchorg/Catch2](https://github.com/catchorg/Catch2)
+*/
+
 //------------------------------------------------------------------------------
 TEST_CASE("Simple: integrate forwards") {
 
@@ -18,7 +25,7 @@ TEST_CASE("Simple: integrate forwards") {
   DM D;
 
   double dt = 0.001;
-  AdamsMoulton::ODESolver_2x2<5> ode{dt, &D};
+  AdamsMoulton::ODESolver2D<5> ode{dt, &D};
 
   REQUIRE(ode.dt() == dt);
 
@@ -71,7 +78,7 @@ TEST_CASE("Simple: integrate backwards") {
   DM D;
 
   double dt = -0.001;
-  AdamsMoulton::ODESolver_2x2<5> ode{dt, &D};
+  AdamsMoulton::ODESolver2D<5> ode{dt, &D};
 
   double t0 = 0.0;
   double f0 = 0.0;
@@ -113,7 +120,7 @@ TEST_CASE("Simple: use drive(t)") {
   DM D;
 
   double dt = 0.001;
-  AdamsMoulton::ODESolver_2x2<5> ode{dt, &D};
+  AdamsMoulton::ODESolver2D<5> ode{dt, &D};
 
   REQUIRE(ode.dt() == dt);
 
@@ -160,7 +167,7 @@ TEST_CASE("Simple: array index argument") {
   DM D;
 
   double dt = 0.001;
-  AdamsMoulton::ODESolver_2x2<5, int, double> ode{dt, &D};
+  AdamsMoulton::ODESolver2D<5, int, double> ode{dt, &D};
 
   REQUIRE(ode.dt() == dt);
 
@@ -204,8 +211,8 @@ TEST_CASE("Simple: K=1,12") {
   DM D;
 
   double dt = 0.001;
-  AdamsMoulton::ODESolver_2x2<1> ode_1{dt, &D};
-  AdamsMoulton::ODESolver_2x2<12> ode_12{dt, &D};
+  AdamsMoulton::ODESolver2D<1> ode_1{dt, &D};
+  AdamsMoulton::ODESolver2D<12> ode_12{dt, &D};
 
   double t0 = 0.0;
   double f0 = 0.0;
@@ -268,8 +275,8 @@ TEST_CASE("Complex") {
 
   constexpr std::size_t N_step = 5; // use 5-step method
 
-  using ComplexAdams = AdamsMoulton::ODESolver_2x2<N_step, std::complex<double>,
-                                                   std::complex<double>>;
+  using ComplexAdams = AdamsMoulton::ODESolver2D<N_step, std::complex<double>,
+                                                 std::complex<double>>;
 
   std::complex<double> z0 = 0.0;
   std::complex<double> y0 = 0.0;
@@ -324,7 +331,7 @@ TEST_CASE("Inhomogenous") {
   DM D;
 
   double dt = 0.001;
-  AdamsMoulton::ODESolver_2x2<5> ode{dt, &D};
+  AdamsMoulton::ODESolver2D<5> ode{dt, &D};
 
   REQUIRE(ode.dt() == dt);
 
