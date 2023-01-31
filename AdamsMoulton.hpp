@@ -447,7 +447,7 @@ private:
   // step size:
   Y m_dt;
   // previous 't' value
-  T m_t{T(0)}; // Should be invalid (nan), but no nan for int
+  // T m_t{T(0)}; // Should be invalid (nan), but no nan for int
   // Pointer to the derivative matrix
   const DerivativeMatrix<T, Y> *m_D;
 
@@ -462,6 +462,9 @@ public:
 
   //! Arrays to store the previous K values of derivatives, df and dg
   std::array<Y, K> df{}, dg{};
+
+  //! Array to store the previous K values of t: f.at(i) = f(t.at(i))
+  std::array<T, K> t{};
 
 public:
   //! Construct the solver. dt is the (constant) step size
@@ -486,42 +489,44 @@ public:
   //! Returns most recent g value. Can also access g array directly
   Y last_g() { return g.back(); }
   //! Returns most recent t value; last_f() := f(last_t())
-  T last_t() { return m_t; }
+  T last_t() { return t.back(); }
   //! Returns the step size
   Y dt() { return m_dt; }
 
   //! Returns derivative, df/dt(t), given f(t),g(t),t
-  Y dfdt(Y ft, Y gt, T t) const {
-    return m_D->a(t) * ft + m_D->b(t) * gt + m_D->Sf(t);
+  Y dfdt(Y ft, Y gt, T tt) const {
+    return m_D->a(tt) * ft + m_D->b(tt) * gt + m_D->Sf(tt);
   }
   //! Returns derivative, dg/dt(t), given f(t),g(t),t
-  Y dgdt(Y ft, Y gt, T t) const {
-    return m_D->c(t) * ft + m_D->d(t) * gt + m_D->Sg(t);
+  Y dgdt(Y ft, Y gt, T tt) const {
+    return m_D->c(tt) * ft + m_D->d(tt) * gt + m_D->Sg(tt);
   }
 
   //! Drives the DE system to next value, F(t), assuming system has already
   //! been solved for the K previous values {t-K*dt, ..., t-dt}.
   /*! @details
-  Note: t must align properly with previous values: i.e., t = last_t + dt \n
+  Note: t must align with previous values: i.e., t_next = last_t + dt \n
   We re-send t to the function to avoid large build-up of small errors. \n
   There's an overload that avoids this, but care should be taken. \n
   For example, the 10,000th point along t grid may not exactly line up with t0
   + 10000*dt, particularly for complicated non-linear grids. \n
 
-  The type of t (T) must match type required to compute DerivativeMatrix. \n
+  The type of t_next (T) must match type required by DerivativeMatrix. \n
   This is often T=double if analytic formula for derivative is known. \n
-  If we have a numerical approximation to the derivative stored, e.g., on a
+  If   we have a numerical approximation to the derivative stored, e.g., on a
   grid, then we may instead have T=std::size_t (or whatever). \n
   */
-  void drive(T t) {
+  void drive(T t_next) {
+
+    // assert (t_next = Approx[next_t(last_t())])
 
     // Use AM method to determine new values, given previous K values:
     const auto sf =
-        f.back() + m_dt * (inner_product(df, am.ak) + am.aK * m_D->Sf(t));
+        f.back() + m_dt * (inner_product(df, am.ak) + am.aK * m_D->Sf(t_next));
     const auto sg =
-        g.back() + m_dt * (inner_product(dg, am.ak) + am.aK * m_D->Sg(t));
-    const auto [a, b, c, d] =
-        std::tuple{m_D->a(t), m_D->b(t), m_D->c(t), m_D->d(t)};
+        g.back() + m_dt * (inner_product(dg, am.ak) + am.aK * m_D->Sg(t_next));
+    const auto [a, b, c, d] = std::tuple{m_D->a(t_next), m_D->b(t_next),
+                                         m_D->c(t_next), m_D->d(t_next)};
     const auto a0 = m_dt * static_cast<Y>(am.aK);
     const auto a02 = a0 * a0;
     const auto det_inv =
@@ -535,13 +540,14 @@ public:
     std::rotate(g.begin(), g.begin() + 1, g.end());
     std::rotate(df.begin(), df.begin() + 1, df.end());
     std::rotate(dg.begin(), dg.begin() + 1, dg.end());
+    std::rotate(t.begin(), t.begin() + 1, t.end());
 
     // Sets new values:
-    m_t = t;
+    t.back() = t_next;
     f.back() = fi;
     g.back() = gi;
-    df.back() = dfdt(fi, gi, t);
-    dg.back() = dgdt(fi, gi, t);
+    df.back() = dfdt(fi, gi, t_next);
+    dg.back() = dgdt(fi, gi, t_next);
   }
 
   //! Overload of drive(T t) for 'default' case, where next t is defined as
@@ -561,7 +567,7 @@ public:
   F[K-1] determined using F[0],F[1],...,F[K-2] and a (K-1)-step AM method \n
   */
   void solve_initial_K(T t0, Y f0, Y g0) {
-    m_t = t0;
+    t.at(0) = t0;
     f.at(0) = f0;
     g.at(0) = g0;
     df.at(0) = dfdt(f0, g0, t0);
@@ -573,42 +579,42 @@ private:
   // only used in solve_initial_K(). Use this, because it works for double t,
   // where next value is t+dt, and for integral t, where next value is t++ is
   // driving forward (dt>0), or t-- if driving backwards (dt<0)
-  T next_t(T t) {
+  T next_t(T last_t) {
     if constexpr (std::is_integral_v<T>) {
-      return (m_dt > 0.0) ? t + 1 : t - 1;
+      return (m_dt > 0.0) ? last_t + 1 : last_t - 1;
     } else {
-      return t + m_dt;
+      return last_t + m_dt;
     }
   }
 
   // Used recursively by solve_initial_K() to find first K points
-  template <std::size_t ik> void first_k_i(T t) {
+  template <std::size_t ik> void first_k_i(T t_next) {
     if constexpr (ik >= K) {
-      (void)t; // suppress unused variable warning on old g++ versions
+      (void)t_next; // suppress unused variable warning on old g++ versions
       return;
     } else {
       constexpr AM_Coefs<ik> ai{};
       // nb: ai.ak is smaller than df; inner_product still works
-      const auto sf =
-          f.at(ik - 1) + m_dt * (inner_product(df, ai.ak) + am.aK * m_D->Sf(t));
-      const auto sg =
-          g.at(ik - 1) + m_dt * (inner_product(dg, ai.ak) + am.aK * m_D->Sg(t));
+      const auto sf = f.at(ik - 1) + m_dt * (inner_product(df, ai.ak) +
+                                             am.aK * m_D->Sf(t_next));
+      const auto sg = g.at(ik - 1) + m_dt * (inner_product(dg, ai.ak) +
+                                             am.aK * m_D->Sg(t_next));
       const auto a0 = m_dt * static_cast<Y>(ai.aK);
       const auto a02 = a0 * a0;
-      const auto [a, b, c, d] =
-          std::tuple{m_D->a(t), m_D->b(t), m_D->c(t), m_D->d(t)};
+      const auto [a, b, c, d] = std::tuple{m_D->a(t_next), m_D->b(t_next),
+                                           m_D->c(t_next), m_D->d(t_next)};
       const auto det_inv =
           Y{1.0} / (Y{1.0} - (a02 * (b * c - a * d) + a0 * (a + d)));
       const auto fi = (sf - a0 * (d * sf - b * sg)) * det_inv;
       const auto gi = (sg - a0 * (-c * sf + a * sg)) * det_inv;
       // Sets new values:
-      m_t = t;
+      t.at(ik) = t_next;
       f.at(ik) = fi;
       g.at(ik) = gi;
-      df.at(ik) = dfdt(fi, gi, t);
-      dg.at(ik) = dgdt(fi, gi, t);
+      df.at(ik) = dfdt(fi, gi, t_next);
+      dg.at(ik) = dgdt(fi, gi, t_next);
       // call recursively
-      first_k_i<ik + 1>(next_t(t));
+      first_k_i<ik + 1>(next_t(t_next));
     }
   }
 };

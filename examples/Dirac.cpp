@@ -73,10 +73,8 @@ int main() {
   std::string ofname{"Dirac.txt"};
   std::ofstream out{ofname};
   out << "r     f(r)    g(r)\n";
-  double r = r0;
   for (std::size_t i = 0; i < ode.f.size(); ++i) {
-    out << r << " " << ode.f.at(i) << " " << ode.g.at(i) << "\n";
-    r += dr;
+    out << ode.t.at(i) << " " << ode.f.at(i) << " " << ode.g.at(i) << "\n";
   }
   while (ode.last_t() < r_max) {
     ode.drive();

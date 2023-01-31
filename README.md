@@ -1,6 +1,6 @@
 # Adams Moulton
 
-A single-file header-only implementation of the Adams-Moulton method for solving Ordinary Differential Equations (ODEs) written using modern c++. Requires c++17.
+A single-file header-only implementation of the Adams-Moulton method for solving Ordinary Differential Equations (ODEs) in using modern c++ [c++17].
 
 Solves a general 2D system of ODEs using K-step Adams-Moulton method,
 including those with inhomogenous terms.
@@ -9,7 +9,7 @@ Works for real and complex value problems.
 
 A 2D system of ODEs could be, e.g., a 2nd-order ODE, or a pair of coupled first-order ODEs.
 
-Could reaonably simply be extened to general N-dimension problems.
+Could reasonably simply be extened to general N-dimension problems.
 
 [![tests][tests-badge]][tests-url]
 [![build][build-badge]][build-url]
@@ -33,7 +33,9 @@ As it's implemented as a single-file header-only library, inclusion into your pr
 #include "path/to/AdamsMoulton.hpp"
 ```
 
-It requires c++17 to work, and has been tested with g++ and clang++.
+See the [examples/](examples/) directory for several examples.
+
+It requires c++17 to work, and has been tested with g++ (7.0 and newer) and clang++ (6.0 and newer).
 The other files included in the repository are examples and tests, which are not required.
 
 The code is documented using doxygen-style comments, meaning it will integrate autmatically into existing doxygen-generated documentation.
@@ -99,6 +101,8 @@ a_k = \frac{(-1)^{K-k}}{k!(K-k)!} \int_0^1\frac{\Pi_{i=0}^K(u+i-1)}{u+K-k-1}{\rm
 $$
 
 These are coded in for $K=[1,12]$, but may easily be extended.
+
+[Back to contents](#contents)
 
 ---
 
@@ -174,7 +178,7 @@ This automatically sets the first K values for F (and dF), given a single
 initial value for F, f0=f(t0), fg=g(t0), by using successive N-step AM
 methods, for N={1,2,...,K-1}.
 
-Alternatively, you may directly access the f,g (function) and df,dg (derivative) arrays, to set these points manually:
+Alternatively, you may directly access the f,g (function), df,dg (derivative), and t (position) arrays, to set these points manually:
 
 ```cpp
   for (std::size_t i = 0; i < ode.K_steps(); ++i) {
@@ -182,13 +186,16 @@ Alternatively, you may directly access the f,g (function) and df,dg (derivative)
     ode.g.at(i) = /*value*/;
     ode.df.at(i) = /*value*/;
     ode.dg.at(i) = /*value*/;
+    ode.t.at(i) = /*value*/;
   }
 ```
 
-* `f`,`g`,`df`, and `dg` are publically-accessible arrays
-* These size $K$ arrays of type $Y$ (`std::array<Y, K>`)
+* `f`,`g`,`df`, `dg`, `t` are publically-accessible arrays
+* `f`,`g`,`df`, `dg` are size $K$ arrays of type $Y$ (`std::array<Y, K>`)
+* `t` is a size $K$ arrays of type $T$ (`std::array<T, K>`)
 * `f` and `g` hold the function values at the previous $K$ points
 * `df`, and `dg` hold the derivatives at the previous $K$ points
+* `t` holds the position value for the previous $K$ points
 * When you drive the ODE forward, only the last $K$ points are kept. You probably want to extract these solutions and store them however you regularly would (see example)
 
 ### 4. Drive the ODE
@@ -224,7 +231,9 @@ You can extract the most recent solutions using these functions:
   T last_t();
 ```
 
-You may also directly access the `f`, `g`, `df`, and `dg` arrays
+You may also directly access the `f`, `g`, `df`, `dg`, and `t` arrays, which store the last K points
+
+[Back to contents](#contents)
 
 ---
 
@@ -237,7 +246,7 @@ Each is designed the demonstrate a capability of the library.
 * **Bessel** -- [Bessel.cpp](examples/Bessel.cpp)
   * Solves the Bessel equation: a common second-order ODE
   * Demonstrates driving ODE forwards (dt>0) and backwards (dt<0)
-    * This example uses GSL (GNU Scientific Library), just to compare against the expected result
+    * This example uses [GSL (GNU Scientific Library)](https://www.gnu.org/software/gsl/), just to compare against the expected result
     * It can be installed, e.g., on ubuntu: `apt install libgsl-dev`
 * **Complex** -- [Complex.cpp](examples/Complex.cpp)
   * Demonstrates use of complex numbers
@@ -342,10 +351,8 @@ Minimal example: -- see full examples included elsewhere
   ode.solve_initial_K(t0, f0, g0);
 
   // Print the first K points:
-  double t = t0;
   for (std::size_t i = 0; i < ode.f.size(); ++i) {
-    std::cout << t << " " << ode.f.at(i) << '\n';
-    t += ode.dt();
+    std::cout << ode.t.at(i) << " " << ode.f.at(i) << '\n';
   }
 
   // Drive forwards another 100 steps
@@ -354,6 +361,8 @@ Minimal example: -- see full examples included elsewhere
     std::cout << ode.last_t() << " " << ode.last_f() << '\n';
   }
 ```
+
+[Back to contents](#contents)
 
 ---
 
@@ -504,11 +513,14 @@ type of dt, and the return value of the Derivative Matrix.
   std::array<Y, K> ODESolver2D::g;
   std::array<Y, K> ODESolver2D::df;
   std::array<Y, K> ODESolver2D::dg;
+  std::array<T, K> ODESolver2D::t;
 ```
 
-* Arrays of size K, type Y.
+* f,g,df,dg are arrays of size K, type Y.
+* t ia an array of size K, type T.
 * f and g hold the previous K functions values
-* g and f hold the previous K derivative values
+* df and dg hold the previous K derivative values
+* t holds the previous K position values
 * Each value is separated by dt
 
 ### Public member functions
@@ -558,6 +570,8 @@ void ODESolver2D::drive(T t);
   * We may re-send t to the function to avoid large build-up of small errors. For example, the 10,000th point along t grid may not exactly line up with `t0 * 10000*dt`, particularly for complicated non-linear grids.
   * There's an overload that avoids this, but care should be taken.
 * The type of t (`T`) must match type required to compute DerivativeMatrix.
+
+[Back to contents](#contents)
   
 [tests-badge]: https://github.com/benroberts999/AdamsMoulton/actions/workflows/tests.yml/badge.svg
 [tests-url]:   https://github.com/benroberts999/AdamsMoulton/actions/workflows/tests.yml

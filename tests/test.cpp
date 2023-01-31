@@ -47,8 +47,10 @@ TEST_CASE("Simple: integrate forwards") {
   for (std::size_t i = 0; i < ode.f.size(); ++i) {
     REQUIRE(ode.f[i] == Approx(std::sin(t)).epsilon(1.0e-5));
     REQUIRE(ode.g[i] == Approx(std::cos(t)).epsilon(1.0e-5));
+    REQUIRE(ode.t[i] == Approx(t));
     t += ode.dt();
   }
+  REQUIRE(ode.last_t() == ode.t.back());
   REQUIRE(ode.last_f() == ode.f.back());
   REQUIRE(ode.last_g() == ode.g.back());
 
@@ -90,6 +92,7 @@ TEST_CASE("Simple: integrate backwards") {
   for (std::size_t i = 0; i < ode.f.size(); ++i) {
     REQUIRE(ode.f[i] == Approx(std::sin(t)).epsilon(1.0e-5));
     REQUIRE(ode.g[i] == Approx(std::cos(t)).epsilon(1.0e-5));
+    REQUIRE(ode.t[i] == Approx(t));
     t += ode.dt();
   }
 
@@ -134,10 +137,12 @@ TEST_CASE("Simple: use drive(t)") {
   for (std::size_t i = 0; i < ode.f.size(); ++i) {
     REQUIRE(ode.f[i] == Approx(std::sin(t)).epsilon(1.0e-5));
     REQUIRE(ode.g[i] == Approx(std::cos(t)).epsilon(1.0e-5));
+    REQUIRE(ode.t[i] == Approx(t));
     t += ode.dt();
   }
   REQUIRE(ode.last_f() == ode.f.back());
   REQUIRE(ode.last_g() == ode.g.back());
+  REQUIRE(ode.last_t() == ode.t.back());
 
   int num_steps = 1000;
   for (int i = 0; i < num_steps; ++i) {
@@ -181,9 +186,12 @@ TEST_CASE("Simple: array index argument") {
     double t = double(i) * ode.dt();
     REQUIRE(ode.f[i] == Approx(std::sin(t)).epsilon(1.0e-5));
     REQUIRE(ode.g[i] == Approx(std::cos(t)).epsilon(1.0e-5));
+    REQUIRE(ode.t[i] == int(i));
   }
   REQUIRE(ode.last_f() == ode.f.back());
   REQUIRE(ode.last_g() == ode.g.back());
+  REQUIRE(ode.last_t() == ode.t.back());
+  REQUIRE(ode.last_t() == ode.K_steps() - 1);
 
   int num_steps = 1000;
   for (int i = 0; i < num_steps; ++i) {
@@ -194,11 +202,42 @@ TEST_CASE("Simple: array index argument") {
   REQUIRE(ode.last_g() ==
           Approx(std::cos(ode.last_t() * ode.dt())).epsilon(1.0e-5));
 
-  REQUIRE(ode.last_t() == Approx((num_steps + (int)ode.K_steps() - 1)));
+  REQUIRE(ode.last_t() == (num_steps + (int)ode.K_steps() - 1));
 }
 
 //------------------------------------------------------------------------------
-TEST_CASE("Simple: K=1,12") {
+template <std::size_t K>
+void helper(const AdamsMoulton::DerivativeMatrix<double> &D, double dt) {
+
+  AdamsMoulton::ODESolver2D<K> ode{dt, &D};
+  REQUIRE(ode.K_steps() == K);
+  REQUIRE(ode.f.size() == K);
+  REQUIRE(ode.g.size() == K);
+  REQUIRE(ode.t.size() == K);
+  REQUIRE(ode.df.size() == K);
+  REQUIRE(ode.dg.size() == K);
+  double t0 = 0.0;
+  double f0 = 0.0;
+  double g0 = 1.0;
+  ode.solve_initial_K(t0, f0, g0);
+  // test the initial points:
+  double t = 0.0;
+  for (std::size_t i = 0; i < ode.f.size(); ++i) {
+    REQUIRE(ode.f[i] == Approx(std::sin(t)).epsilon(1.0e-5));
+    REQUIRE(ode.g[i] == Approx(std::cos(t)).epsilon(1.0e-5));
+    REQUIRE(ode.t[i] == Approx(t).epsilon(1.0e-5));
+    t += ode.dt();
+  }
+
+  int num_steps = 1000;
+  for (int i = 0; i < num_steps; ++i) {
+    ode.drive();
+  }
+  REQUIRE(ode.last_f() == Approx(std::sin(ode.last_t())).epsilon(1.0e-5));
+}
+
+//------------------------------------------------------------------------------
+TEST_CASE("Simple: K=[1,12]") {
   // y''(x) = -y(x)
   // y(0)=0, y'(0)=1
   // => y(x) = sin(x)
@@ -211,36 +250,19 @@ TEST_CASE("Simple: K=1,12") {
   DM D;
 
   double dt = 0.001;
-  AdamsMoulton::ODESolver2D<1> ode_1{dt, &D};
-  AdamsMoulton::ODESolver2D<12> ode_12{dt, &D};
 
-  double t0 = 0.0;
-  double f0 = 0.0;
-  double g0 = 1.0;
-  ode_1.solve_initial_K(t0, f0, g0);
-  ode_12.solve_initial_K(t0, f0, g0);
-
-  // test the initial points:
-  double t = 0.0;
-  for (std::size_t i = 0; i < ode_1.f.size(); ++i) {
-    REQUIRE(ode_1.f[i] == Approx(std::sin(t)).epsilon(1.0e-4));
-    REQUIRE(ode_1.g[i] == Approx(std::cos(t)).epsilon(1.0e-4));
-    t += ode_1.dt();
-  }
-  t = 0.0;
-  for (std::size_t i = 0; i < ode_12.f.size(); ++i) {
-    REQUIRE(ode_12.f[i] == Approx(std::sin(t)).epsilon(1.0e-5));
-    REQUIRE(ode_12.g[i] == Approx(std::cos(t)).epsilon(1.0e-5));
-    t += ode_12.dt();
-  }
-
-  int num_steps = 1000;
-  for (int i = 0; i < num_steps; ++i) {
-    ode_1.drive();
-    ode_12.drive();
-  }
-  REQUIRE(ode_1.last_f() == Approx(std::sin(ode_1.last_t())).epsilon(1.0e-4));
-  REQUIRE(ode_12.last_f() == Approx(std::sin(ode_12.last_t())).epsilon(1.0e-5));
+  helper<1>(D, dt);
+  helper<2>(D, dt);
+  helper<3>(D, dt);
+  helper<4>(D, dt);
+  helper<5>(D, dt);
+  helper<6>(D, dt);
+  helper<7>(D, dt);
+  helper<8>(D, dt);
+  helper<9>(D, dt);
+  helper<10>(D, dt);
+  helper<11>(D, dt);
+  helper<12>(D, dt);
 }
 
 //------------------------------------------------------------------------------

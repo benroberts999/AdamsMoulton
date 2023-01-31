@@ -48,7 +48,7 @@ int main() {
   constexpr std::size_t N_step = 5; // use 5-step method
 
   using ComplexAdams = AdamsMoulton::ODESolver2D<N_step, std::complex<double>,
-                                                   std::complex<double>>;
+                                                 std::complex<double>>;
 
   // We will solve the ODE twice, once along the real axis, then along the
   // imaginary axis.
@@ -72,13 +72,11 @@ int main() {
   ode_iz.solve_initial_K(z0, y0, dy0);
 
   // store the initial K points in the output array:
-  auto rz = z0;
-  auto iz = z0;
   for (std::size_t i = 0; i < ode.f.size(); ++i) {
+    auto rz = ode.t.at(i);
+    auto iz = ode_iz.t.at(i);
     y_out_realz.emplace_back(rz.real(), ode.f.at(i));
     y_out_imagz.emplace_back(iz.imag(), ode_iz.f.at(i));
-    rz += ode.dt();
-    iz += ode_iz.dt();
   }
 
   // Integrate outwards to |z|=10

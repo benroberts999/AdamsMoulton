@@ -70,11 +70,10 @@ int main() {
   std::cout << "Compare initial K points to expected (exact) solution:\n";
   std::cout << "  t       y(t)         [Exact Soln   ]  dy/dt(t)     [Exact "
                "Soln   ]\n";
-  double t = t0;
   for (std::size_t i = 0; i < ode.f.size(); ++i) {
+    const auto t = ode.t[i];
     printf("%8.4f %13.10f [%13.10f] %13.10f [%13.10f]\n", t, ode.f[i], y(t),
            ode.g[i], dy(t));
-    t += ode.dt();
   }
 
   // Solve the ODE out to very large t

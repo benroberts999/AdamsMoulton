@@ -77,11 +77,10 @@ int main() {
   std::cout << "Compare initial K points to expected (exact) solution:\n";
   std::cout << "  t       y(t)         [Exact Soln   ]  dy/dt(t)     [Exact "
                "Soln   ]\n";
-  double t = t0;
   for (std::size_t i = 0; i < ode.f.size(); ++i) {
+    const auto t = ode.t[i];
     printf("%8.4f %13.10f [%13.10f] %13.10f [%13.10f]\n", t, ode.f[i], y(t),
            ode.g[i], dy(t));
-    t += ode.dt();
   }
 
   // Solve the ODE out to very large t
@@ -113,11 +112,10 @@ int main() {
 
   // The "previous" K points are stored in order of the solution, regardless of
   // the direction we drive the ODE:
-  double t2 = -t0;
   for (std::size_t i = 0; i < ode_back.f.size(); ++i) {
+    const auto t = ode_back.t[i];
     printf("%8.4f %13.10f [%13.10f] %13.10f [%13.10f]\n", t, ode_back.f[i],
-           y(t2), ode_back.g[i], dy(t2));
-    t += ode_back.dt();
+           y(t), ode_back.g[i], dy(t));
   }
 
   while (ode_back.last_t() > backwards_target) {

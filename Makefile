@@ -5,7 +5,8 @@ WARN=-Wall -Wpedantic -Wextra -Wdouble-promotion -Wconversion -Wshadow \
 -Weffc++ -Wsign-conversion
 OPT=-O3
 
-all: Bessel Complex Schrodinger Dirac Inhomogenous
+default: Bessel Complex Schrodinger Dirac Inhomogenous
+all: default test
 
 clean:
 	rm -f -v Bessel Complex Schrodinger Dirac Inhomogenous test coverage coverage.info coverage-test.gcda coverage-test.gcno
